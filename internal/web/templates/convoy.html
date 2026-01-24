@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gas Town Dashboard</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/js/sprite.js"></script>
+    <script src="/static/js/worker.js"></script>
     <style>
         :root {
             --bg-dark: #1a1a2e;
@@ -320,6 +322,31 @@
             opacity: 0;
             transition: opacity 200ms ease-in;
         }
+
+        /* Worker Canvas */
+        #workerCanvas {
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(180deg, #0f1419 0%, #1a1a2e 100%);
+            border-radius: 8px;
+            margin-bottom: 32px;
+            border: 1px solid var(--border);
+        }
+
+        .canvas-container {
+            position: relative;
+        }
+
+        .canvas-label {
+            position: absolute;
+            top: 12px;
+            left: 16px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -331,6 +358,12 @@
                 <span class="htmx-indicator">⟳</span>
             </span>
         </header>
+
+        <!-- Worker Animation Canvas -->
+        <div class="canvas-container">
+            <canvas id="workerCanvas" width="1200" height="400"></canvas>
+            <div class="canvas-label">🐾 Worker Activity</div>
+        </div>
 
         {{if .Convoys}}
         <table class="convoy-table">
@@ -454,5 +487,117 @@
         </table>
         {{end}}
     </div>
+
+    <script>
+        // Initialize Worker Animation System
+        (async function() {
+            const canvas = document.getElementById('workerCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // Set up coordinate system: origin at center
+            function toScreenX(worldX) {
+                return canvas.width / 2 + worldX;
+            }
+
+            function toScreenY(worldY) {
+                return canvas.height / 2 + worldY;
+            }
+
+            // Clear canvas with desert background
+            function clear() {
+                // Desert gradient background
+                const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                gradient.addColorStop(0, '#1a1a2e');
+                gradient.addColorStop(1, '#16213e');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Draw simple buildings as placeholders
+            function drawBuildings(buildings) {
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+
+                for (const building of buildings) {
+                    // Building shape
+                    ctx.fillStyle = '#0f3460';
+                    ctx.fillRect(building.x - 30, building.y - 40, 60, 80);
+
+                    // Building label
+                    ctx.fillStyle = '#aaa';
+                    ctx.font = '10px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(building.name, building.x, building.y + 50);
+                }
+
+                ctx.restore();
+            }
+
+            // Define building positions (simple layout)
+            const buildings = [
+                { name: 'Mayor', x: -200, y: -100 },
+                { name: 'Witness', x: 200, y: -100 },
+                { name: 'Refinery', x: 0, y: 100 },
+            ];
+
+            // Create worker atlas and animations
+            const workerAtlas = await createPlaceholderWorkerAtlas('#4ade80');
+            const animations = createDefaultWorkerAnimations(workerAtlas);
+            const workerManager = new WorkerManager(workerAtlas, animations, buildings);
+
+            // Sync with polecat data from page
+            function syncWorkers() {
+                const polecatData = [];
+                {{if .Polecats}}
+                {{range .Polecats}}
+                polecatData.push({
+                    name: '{{.Name}}',
+                    rig: '{{.Rig}}',
+                    status: '{{.StatusHint}}'
+                });
+                {{end}}
+                {{end}}
+
+                workerManager.syncWithPolecats(polecatData);
+            }
+
+            // Initial sync
+            syncWorkers();
+
+            // Re-sync when HTMX updates the page
+            document.body.addEventListener('htmx:afterSwap', () => {
+                syncWorkers();
+            });
+
+            // Animation loop
+            let lastTime = performance.now();
+
+            function animate(currentTime) {
+                const deltaTime = currentTime - lastTime;
+                lastTime = currentTime;
+
+                // Clear and draw
+                clear();
+
+                // Transform to world coordinates
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+
+                // Draw buildings
+                drawBuildings(buildings);
+
+                // Update and render workers
+                workerManager.update(deltaTime);
+                workerManager.render(ctx);
+
+                ctx.restore();
+
+                requestAnimationFrame(animate);
+            }
+
+            // Start animation loop
+            requestAnimationFrame(animate);
+        })();
+    </script>
 </body>
 </html>
