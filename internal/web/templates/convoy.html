@@ -454,5 +454,120 @@
         </table>
         {{end}}
     </div>
+
+    <script>
+        // WebSocket connection for real-time updates
+        (function() {
+            // Determine WebSocket URL based on current location
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = protocol + '//' + window.location.host + '/ws';
+
+            let ws;
+            let reconnectAttempts = 0;
+            const maxReconnectAttempts = 5;
+            const reconnectDelay = 3000; // 3 seconds
+
+            function connect() {
+                console.log('Connecting to WebSocket:', wsUrl);
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                    reconnectAttempts = 0;
+                    updateConnectionStatus(true);
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        console.log('WebSocket message:', message);
+                        handleMessage(message);
+                    } catch (e) {
+                        console.error('Error parsing WebSocket message:', e);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateConnectionStatus(false);
+                };
+
+                ws.onclose = function() {
+                    console.log('WebSocket disconnected');
+                    updateConnectionStatus(false);
+
+                    // Attempt to reconnect
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        console.log('Reconnecting in ' + reconnectDelay + 'ms (attempt ' + reconnectAttempts + '/' + maxReconnectAttempts + ')');
+                        setTimeout(connect, reconnectDelay);
+                    } else {
+                        console.error('Max reconnect attempts reached. Falling back to HTMX polling.');
+                        // HTMX will continue polling
+                    }
+                };
+            }
+
+            function handleMessage(message) {
+                switch (message.type) {
+                    case 'map_update':
+                        handleMapUpdate(message.data);
+                        break;
+                    case 'agent_status':
+                        handleAgentStatus(message.data);
+                        break;
+                    case 'convoy_progress':
+                        handleConvoyProgress(message.data);
+                        break;
+                    case 'error':
+                        console.error('Server error:', message.data);
+                        break;
+                    default:
+                        console.log('Unknown message type:', message.type);
+                }
+            }
+
+            function handleMapUpdate(data) {
+                // For now, just log the update
+                // In the future, we can update the DOM directly
+                console.log('Map update:', data);
+
+                // Trigger HTMX refresh to show the new data
+                // This is a simple approach - we'll refine it later
+                if (document.querySelector('[hx-get]')) {
+                    htmx.trigger(document.querySelector('[hx-get]'), 'htmx:trigger');
+                }
+            }
+
+            function handleAgentStatus(data) {
+                console.log('Agent status update:', data);
+            }
+
+            function handleConvoyProgress(data) {
+                console.log('Convoy progress update:', data);
+            }
+
+            function updateConnectionStatus(connected) {
+                const refreshInfo = document.querySelector('.refresh-info');
+                if (!refreshInfo) return;
+
+                if (connected) {
+                    refreshInfo.innerHTML = '🟢 Live (WebSocket) <span class="htmx-indicator">⟳</span>';
+                } else {
+                    refreshInfo.innerHTML = '🟡 Polling (10s) <span class="htmx-indicator">⟳</span>';
+                }
+            }
+
+            // Start WebSocket connection
+            connect();
+
+            // Clean up on page unload
+            window.addEventListener('beforeunload', function() {
+                if (ws) {
+                    ws.close();
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

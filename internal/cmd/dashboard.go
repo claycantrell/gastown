@@ -2,13 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os/exec"
 	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/steveyegge/gastown/internal/tui/feed"
 	"github.com/steveyegge/gastown/internal/web"
+	"github.com/steveyegge/gastown/internal/websocket"
 	"github.com/steveyegge/gastown/internal/workspace"
 )
 
@@ -44,7 +47,8 @@ func init() {
 
 func runDashboard(cmd *cobra.Command, args []string) error {
 	// Verify we're in a workspace
-	if _, err := workspace.FindFromCwdOrError(); err != nil {
+	townRoot, err := workspace.FindFromCwdOrError()
+	if err != nil {
 		return fmt.Errorf("not in a Gas Town workspace: %w", err)
 	}
 
@@ -54,10 +58,53 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating convoy fetcher: %w", err)
 	}
 
+	// Create event sources for WebSocket
+	var eventSource feed.EventSource
+
+	// Try to create BdActivitySource (use town root as working directory)
+	bdSource, err := feed.NewBdActivitySource(townRoot)
+	if err != nil {
+		log.Printf("Warning: Could not create bd activity source: %v", err)
+		// Continue without bd activity source
+	}
+
+	// Try to create GtEventsSource
+	gtSource, err := feed.NewGtEventsSource(townRoot)
+	if err != nil {
+		log.Printf("Warning: Could not create gt events source: %v", err)
+		// Continue without gt events source
+	}
+
+	// Combine sources
+	if bdSource != nil && gtSource != nil {
+		eventSource = feed.NewCombinedSource(bdSource, gtSource)
+	} else if bdSource != nil {
+		eventSource = bdSource
+	} else if gtSource != nil {
+		eventSource = gtSource
+	}
+
+	// Create WebSocket hub if we have an event source
+	var wsHub *websocket.Hub
+	if eventSource != nil {
+		wsHub = websocket.NewHub(eventSource)
+		go wsHub.Run()
+		log.Printf("WebSocket hub started")
+	} else {
+		log.Printf("Warning: No event sources available, WebSocket disabled")
+	}
+
 	// Create the handler
-	handler, err := web.NewConvoyHandler(fetcher)
+	handler, err := web.NewConvoyHandler(fetcher, wsHub)
 	if err != nil {
 		return fmt.Errorf("creating convoy handler: %w", err)
+	}
+
+	// Create HTTP mux and register handlers
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	if wsHub != nil {
+		mux.HandleFunc("/ws", handler.HandleWebSocket)
 	}
 
 	// Build the URL
@@ -70,11 +117,14 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 
 	// Start the server with timeouts
 	fmt.Printf("🚚 Gas Town Dashboard starting at %s\n", url)
+	if wsHub != nil {
+		fmt.Printf("   WebSocket endpoint: ws://localhost:%d/ws\n", dashboardPort)
+	}
 	fmt.Printf("   Press Ctrl+C to stop\n")
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", dashboardPort),
-		Handler:           handler,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

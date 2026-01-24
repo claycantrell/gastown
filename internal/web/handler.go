@@ -2,7 +2,11 @@ package web
 
 import (
 	"html/template"
+	"log"
 	"net/http"
+
+	gorillaws "github.com/gorilla/websocket"
+	"github.com/steveyegge/gastown/internal/websocket"
 )
 
 // ConvoyFetcher defines the interface for fetching convoy data.
@@ -16,10 +20,11 @@ type ConvoyFetcher interface {
 type ConvoyHandler struct {
 	fetcher  ConvoyFetcher
 	template *template.Template
+	wsHub    *websocket.Hub
 }
 
 // NewConvoyHandler creates a new convoy handler with the given fetcher.
-func NewConvoyHandler(fetcher ConvoyFetcher) (*ConvoyHandler, error) {
+func NewConvoyHandler(fetcher ConvoyFetcher, wsHub *websocket.Hub) (*ConvoyHandler, error) {
 	tmpl, err := LoadTemplates()
 	if err != nil {
 		return nil, err
@@ -28,6 +33,7 @@ func NewConvoyHandler(fetcher ConvoyFetcher) (*ConvoyHandler, error) {
 	return &ConvoyHandler{
 		fetcher:  fetcher,
 		template: tmpl,
+		wsHub:    wsHub,
 	}, nil
 }
 
@@ -63,4 +69,35 @@ func (h *ConvoyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to render template", http.StatusInternalServerError)
 		return
 	}
+}
+
+var upgrader = gorillaws.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// For local dashboard, allow all origins
+		// TODO: For production, validate origin properly
+		return true
+	},
+}
+
+// HandleWebSocket handles WebSocket upgrade requests
+func (h *ConvoyHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	if h.wsHub == nil {
+		http.Error(w, "WebSocket not configured", http.StatusInternalServerError)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade error: %v", err)
+		return
+	}
+
+	client := websocket.NewClient(h.wsHub, conn)
+	h.wsHub.Register(client)
+
+	// Start client pumps
+	go client.WritePump()
+	go client.ReadPump()
 }
