@@ -265,9 +265,9 @@ func TestConvoyHandler_MergeQueueRendering(t *testing.T) {
 
 	body := w.Body.String()
 
-	// Check merge queue section header
-	if !strings.Contains(body, "Refinery Merge Queue") {
-		t.Error("Response should contain merge queue section header")
+	// Check merge queue modal header (now in modal instead of main page)
+	if !strings.Contains(body, "Refinery - Merge Queue") {
+		t.Error("Response should contain merge queue modal header")
 	}
 
 	// Check PR numbers are rendered
@@ -576,20 +576,20 @@ func TestConvoyHandler_FullDashboard(t *testing.T) {
 	body := w.Body.String()
 
 	// Verify all three sections are present
-	if !strings.Contains(body, "Gas Town Convoys") {
+	if !strings.Contains(body, "Gas Town Dashboard") {
 		t.Error("Response should contain main header")
 	}
 	if !strings.Contains(body, "hq-cv-full") {
 		t.Error("Response should contain convoy data")
 	}
-	if !strings.Contains(body, "Refinery Merge Queue") {
-		t.Error("Response should contain merge queue section")
+	if !strings.Contains(body, "Refinery - Merge Queue") {
+		t.Error("Response should contain merge queue modal")
 	}
 	if !strings.Contains(body, "#789") {
 		t.Error("Response should contain PR data")
 	}
-	if !strings.Contains(body, "Polecat Workers") {
-		t.Error("Response should contain polecat section")
+	if !strings.Contains(body, "Witness - Polecat Workers") {
+		t.Error("Response should contain polecat modal")
 	}
 	if !strings.Contains(body, "worker1") {
 		t.Error("Response should contain polecat data")
@@ -676,14 +676,14 @@ func TestE2E_Server_FullDashboard(t *testing.T) {
 		name    string
 		content string
 	}{
-		{"Convoy section header", "Gas Town Convoys"},
+		{"Dashboard header", "Gas Town Dashboard"},
 		{"Convoy ID", "hq-cv-e2e"},
 		{"Convoy title", "E2E Test Convoy"},
 		{"Convoy progress", "2/4"},
-		{"Merge queue section", "Refinery Merge Queue"},
+		{"Merge queue modal", "Refinery - Merge Queue"},
 		{"PR number", "#101"},
 		{"PR repo", "roxas"},
-		{"Polecat section", "Polecat Workers"},
+		{"Polecat modal", "Witness - Polecat Workers"},
 		{"Polecat name", "furiosa"},
 		{"Polecat status", "Running E2E tests"},
 		{"HTMX auto-refresh", `hx-trigger="every 10s"`},
@@ -771,9 +771,9 @@ func TestE2E_Server_MergeQueueEmpty(t *testing.T) {
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	body := string(bodyBytes)
 
-	// Section header should always be visible
-	if !strings.Contains(body, "Refinery Merge Queue") {
-		t.Error("Merge queue section should always be visible")
+	// Modal header should always be visible
+	if !strings.Contains(body, "Refinery - Merge Queue") {
+		t.Error("Merge queue modal should always be present")
 	}
 
 	// Empty state message

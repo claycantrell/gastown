@@ -320,139 +320,591 @@
             opacity: 0;
             transition: opacity 200ms ease-in;
         }
+
+        /* Visual Map Styles */
+        .visual-map {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 32px;
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            min-height: 200px;
+        }
+
+        .building {
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 200ms ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .building:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--green);
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.2);
+        }
+
+        .building-icon {
+            font-size: 3rem;
+            line-height: 1;
+        }
+
+        .building-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .building-status {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--bg-dark);
+            z-index: 1;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.5rem;
+            padding: 4px 8px;
+            line-height: 1;
+            transition: color 200ms ease;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        /* Adjust existing table styles for modal use */
+        .modal-body .convoy-table {
+            margin: 0;
+        }
+
+        .section-header-inline {
+            margin: 0 0 16px 0;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        /* Polecat Sprites Section */
+        .polecats-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .polecats-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .polecat-sprite {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 150ms ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+        }
+
+        .polecat-sprite:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--yellow);
+            transform: translateY(-2px);
+        }
+
+        .polecat-emoji {
+            font-size: 1.25rem;
+        }
+
+        .polecat-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .polecat-label {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .polecat-rig {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .section-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Polecat detail styles in modal */
+        .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .detail-section h3 {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .detail-content {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+            font-size: 0.8125rem;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
     <div class="dashboard" hx-get="/" hx-trigger="every 10s" hx-swap="outerHTML">
         <header>
-            <h1>🚚 Gas Town Convoys</h1>
+            <h1>🚚 Gas Town Dashboard</h1>
             <span class="refresh-info">
                 Auto-refresh: every 10s
                 <span class="htmx-indicator">⟳</span>
             </span>
         </header>
 
-        {{if .Convoys}}
-        <table class="convoy-table">
-            <thead>
-                <tr>
-                    <th>Status</th>
-                    <th>Convoy</th>
-                    <th>Progress</th>
-                    <th>Last Activity</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Convoys}}
-                <tr class="{{workStatusClass .WorkStatus}}">
-                    <td>
-                        <span class="work-status">{{.WorkStatus}}</span>
-                    </td>
-                    <td>
-                        <span class="convoy-id">{{.ID}}</span>
-                        <span class="convoy-title">{{.Title}}</span>
-                    </td>
-                    <td class="progress">
-                        {{.Progress}}
-                        {{if .Total}}
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: {{progressPercent .Completed .Total}}%;"></div>
-                        </div>
-                        {{end}}
-                    </td>
-                    <td class="{{activityClass .LastActivity}}">
-                        <span class="activity-dot"></span>
-                        {{.LastActivity.FormattedAge}}
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
-        {{else}}
-        <div class="empty-state">
-            <h2>No convoys found</h2>
-            <p>Create a convoy with: gt convoy create &lt;name&gt; [issues...]</p>
-        </div>
-        {{end}}
+        <!-- Visual Map -->
+        <div class="visual-map">
+            <div class="building" onclick="showModal('mayor')">
+                <div class="building-icon">🎩</div>
+                <div class="building-name">Mayor</div>
+                <div class="building-status">{{len .Convoys}} convoy(s)</div>
+            </div>
 
-        <h2 class="section-header">🔀 Refinery Merge Queue</h2>
-        {{if .MergeQueue}}
-        <table class="convoy-table">
-            <thead>
-                <tr>
-                    <th>PR #</th>
-                    <th>Repo</th>
-                    <th>Title</th>
-                    <th>CI Status</th>
-                    <th>Mergeable</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .MergeQueue}}
-                <tr class="{{.ColorClass}}">
-                    <td>
-                        <a href="{{.URL}}" target="_blank" class="pr-link">#{{.Number}}</a>
-                    </td>
-                    <td>{{.Repo}}</td>
-                    <td>
-                        <span class="pr-title">{{.Title}}</span>
-                    </td>
-                    <td>
-                        {{if eq .CIStatus "pass"}}
-                        <span class="ci-status ci-pass">✓ Pass</span>
-                        {{else if eq .CIStatus "fail"}}
-                        <span class="ci-status ci-fail">✗ Fail</span>
-                        {{else}}
-                        <span class="ci-status ci-pending">⏳ Pending</span>
-                        {{end}}
-                    </td>
-                    <td>
-                        {{if eq .Mergeable "ready"}}
-                        <span class="merge-status merge-ready">Ready</span>
-                        {{else if eq .Mergeable "conflict"}}
-                        <span class="merge-status merge-conflict">Conflict</span>
-                        {{else}}
-                        <span class="merge-status merge-pending">Pending</span>
-                        {{end}}
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
-        {{else}}
-        <div class="empty-state-inline">
-            <p>No PRs in queue</p>
+            <div class="building" onclick="showModal('refinery')">
+                <div class="building-icon">🔀</div>
+                <div class="building-name">Refinery</div>
+                <div class="building-status">{{len .MergeQueue}} PR(s)</div>
+            </div>
+
+            <div class="building" onclick="showModal('witness')">
+                <div class="building-icon">👁️</div>
+                <div class="building-name">Witness</div>
+                <div class="building-status">{{len .Polecats}} worker(s)</div>
+            </div>
+
+            <div class="building" onclick="showModal('deacon')">
+                <div class="building-icon">📬</div>
+                <div class="building-name">Deacon</div>
+                <div class="building-status">Mail queue</div>
+            </div>
+        </div>
+
+        {{if .Convoys}}
+        <div class="visual-map">
+            <div style="grid-column: 1 / -1;">
+                <div class="section-title">🚚 Active Convoys</div>
+                <div class="polecats-grid">
+                    {{range .Convoys}}
+                    <div class="polecat-sprite" onclick="showModal('convoy-{{.ID}}')">
+                        <div class="polecat-emoji">🚛</div>
+                        <div class="polecat-info">
+                            <div class="polecat-label">{{.ID}}</div>
+                            <div class="polecat-rig">{{.Progress}}</div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
         </div>
         {{end}}
 
         {{if .Polecats}}
-        <h2 class="section-header">🐾 Polecat Workers</h2>
-        <table class="convoy-table">
-            <thead>
-                <tr>
-                    <th>Polecat</th>
-                    <th>Rig</th>
-                    <th>Last Activity</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Polecats}}
-                <tr>
-                    <td>
-                        <span class="convoy-id">{{.Name}}</span>
-                    </td>
-                    <td>{{.Rig}}</td>
-                    <td class="{{activityClass .LastActivity}}">
-                        <span class="activity-dot"></span>
-                        {{.LastActivity.FormattedAge}}
-                    </td>
-                    <td class="status-hint">{{.StatusHint}}</td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+        <div class="visual-map">
+            <div style="grid-column: 1 / -1;">
+                <div class="section-title">🐾 Active Workers</div>
+                <div class="polecats-grid">
+                    {{range .Polecats}}
+                    <div class="polecat-sprite" onclick="showModal('polecat-{{.SessionID}}')">
+                        <div class="polecat-emoji">🦨</div>
+                        <div class="polecat-info">
+                            <div class="polecat-label">{{.Name}}</div>
+                            <div class="polecat-rig">{{.Rig}}</div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+        {{end}}
+
+        <!-- Modals -->
+        <div id="modal-mayor" class="modal-overlay" onclick="closeModal('mayor', event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <span>🎩</span>
+                        <span>Mayor - Convoy Management</span>
+                    </div>
+                    <button class="modal-close" onclick="closeModal('mayor')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    {{if .Convoys}}
+                    <table class="convoy-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Convoy</th>
+                                <th>Progress</th>
+                                <th>Last Activity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .Convoys}}
+                            <tr class="{{workStatusClass .WorkStatus}}">
+                                <td>
+                                    <span class="work-status">{{.WorkStatus}}</span>
+                                </td>
+                                <td>
+                                    <span class="convoy-id">{{.ID}}</span>
+                                    <span class="convoy-title">{{.Title}}</span>
+                                </td>
+                                <td class="progress">
+                                    {{.Progress}}
+                                    {{if .Total}}
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: {{progressPercent .Completed .Total}}%;"></div>
+                                    </div>
+                                    {{end}}
+                                </td>
+                                <td class="{{activityClass .LastActivity}}">
+                                    <span class="activity-dot"></span>
+                                    {{.LastActivity.FormattedAge}}
+                                </td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                    {{else}}
+                    <div class="empty-state-inline">
+                        <p>No convoys found. Create a convoy with: gt convoy create &lt;name&gt; [issues...]</p>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-refinery" class="modal-overlay" onclick="closeModal('refinery', event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <span>🔀</span>
+                        <span>Refinery - Merge Queue</span>
+                    </div>
+                    <button class="modal-close" onclick="closeModal('refinery')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    {{if .MergeQueue}}
+                    <table class="convoy-table">
+                        <thead>
+                            <tr>
+                                <th>PR #</th>
+                                <th>Repo</th>
+                                <th>Title</th>
+                                <th>CI Status</th>
+                                <th>Mergeable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .MergeQueue}}
+                            <tr class="{{.ColorClass}}">
+                                <td>
+                                    <a href="{{.URL}}" target="_blank" class="pr-link">#{{.Number}}</a>
+                                </td>
+                                <td>{{.Repo}}</td>
+                                <td>
+                                    <span class="pr-title">{{.Title}}</span>
+                                </td>
+                                <td>
+                                    {{if eq .CIStatus "pass"}}
+                                    <span class="ci-status ci-pass">✓ Pass</span>
+                                    {{else if eq .CIStatus "fail"}}
+                                    <span class="ci-status ci-fail">✗ Fail</span>
+                                    {{else}}
+                                    <span class="ci-status ci-pending">⏳ Pending</span>
+                                    {{end}}
+                                </td>
+                                <td>
+                                    {{if eq .Mergeable "ready"}}
+                                    <span class="merge-status merge-ready">Ready</span>
+                                    {{else if eq .Mergeable "conflict"}}
+                                    <span class="merge-status merge-conflict">Conflict</span>
+                                    {{else}}
+                                    <span class="merge-status merge-pending">Pending</span>
+                                    {{end}}
+                                </td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                    {{else}}
+                    <div class="empty-state-inline">
+                        <p>No PRs in queue</p>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-witness" class="modal-overlay" onclick="closeModal('witness', event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <span>👁️</span>
+                        <span>Witness - Polecat Workers</span>
+                    </div>
+                    <button class="modal-close" onclick="closeModal('witness')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    {{if .Polecats}}
+                    <table class="convoy-table">
+                        <thead>
+                            <tr>
+                                <th>Polecat</th>
+                                <th>Rig</th>
+                                <th>Last Activity</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .Polecats}}
+                            <tr>
+                                <td>
+                                    <span class="convoy-id">{{.Name}}</span>
+                                </td>
+                                <td>{{.Rig}}</td>
+                                <td class="{{activityClass .LastActivity}}">
+                                    <span class="activity-dot"></span>
+                                    {{.LastActivity.FormattedAge}}
+                                </td>
+                                <td class="status-hint">{{.StatusHint}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                    {{else}}
+                    <div class="empty-state-inline">
+                        <p>No active polecat workers</p>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-deacon" class="modal-overlay" onclick="closeModal('deacon', event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <span>📬</span>
+                        <span>Deacon - Mail Queue</span>
+                    </div>
+                    <button class="modal-close" onclick="closeModal('deacon')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="empty-state-inline">
+                        <p>Mail queue view - Coming soon</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{range $convoy := .Convoys}}
+        <div id="modal-convoy-{{$convoy.ID}}" class="modal-overlay" onclick="closeModal('convoy-{{$convoy.ID}}', event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <span>🚛</span>
+                        <span>{{$convoy.ID}}: {{$convoy.Title}}</span>
+                    </div>
+                    <button class="modal-close" onclick="closeModal('convoy-{{$convoy.ID}}')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="detail-section">
+                        <h3>Progress</h3>
+                        <div class="detail-content">Status: {{$convoy.WorkStatus}}
+Progress: {{$convoy.Progress}}
+Last Activity: {{$convoy.LastActivity.FormattedAge}}</div>
+                    </div>
+
+                    {{if $convoy.TrackedIssues}}
+                    <div class="detail-section">
+                        <h3>Tracked Issues</h3>
+                        <table class="convoy-table">
+                            <thead>
+                                <tr>
+                                    <th>Issue</th>
+                                    <th>Status</th>
+                                    <th>Assignee</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range $convoy.TrackedIssues}}
+                                <tr>
+                                    <td>
+                                        <span class="convoy-id">{{.ID}}</span>
+                                        <span class="convoy-title">{{.Title}}</span>
+                                    </td>
+                                    <td>{{.Status}}</td>
+                                    <td>{{if .Assignee}}{{.Assignee}}{{else}}-{{end}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+        {{end}}
+
+        {{range .Polecats}}
+        <div id="modal-polecat-{{.SessionID}}" class="modal-overlay" onclick="closeModal('polecat-{{.SessionID}}', event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <span>🦨</span>
+                        <span>{{.Name}} ({{.Rig}})</span>
+                    </div>
+                    <button class="modal-close" onclick="closeModal('polecat-{{.SessionID}}')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="detail-section">
+                        <h3>Session Info</h3>
+                        <div class="detail-content">Session ID: {{.SessionID}}
+Last Activity: {{.LastActivity.FormattedAge}}</div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Current Status</h3>
+                        <div class="detail-content">{{if .StatusHint}}{{.StatusHint}}{{else}}Idle{{end}}</div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Quick Actions</h3>
+                        <div class="detail-content">Attach to session: tmux attach -t {{.SessionID}}
+View logs: tmux capture-pane -t {{.SessionID}} -p</div>
+                    </div>
+                </div>
+            </div>
+        </div>
         {{end}}
     </div>
+
+    <script>
+        function showModal(modalId) {
+            document.getElementById('modal-' + modalId).classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(modalId, event) {
+            if (event) {
+                // Only close if clicking on the overlay, not the modal content
+                if (event.target.classList.contains('modal-overlay')) {
+                    document.getElementById('modal-' + modalId).classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            } else {
+                // Direct call from close button
+                document.getElementById('modal-' + modalId).classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                document.querySelectorAll('.modal-overlay.active').forEach(function(modal) {
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                });
+            }
+        });
+    </script>
 </body>
 </html>
