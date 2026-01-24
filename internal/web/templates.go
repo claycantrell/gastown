@@ -60,6 +60,22 @@ type TrackedIssue struct {
 	Assignee string
 }
 
+// MailQueueRow represents a mail queue in the dashboard.
+type MailQueueRow struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	ClaimPattern    string `json:"claim_pattern"`
+	Status          string `json:"status"`
+	MaxConcurrency  int    `json:"max_concurrency"`
+	ProcessingOrder string `json:"processing_order"`
+	AvailableCount  int    `json:"available_count"`
+	ProcessingCount int    `json:"processing_count"`
+	CompletedCount  int    `json:"completed_count"`
+	FailedCount     int    `json:"failed_count"`
+	CreatedBy       string `json:"created_by"`
+	CreatedAt       string `json:"created_at"`
+}
+
 // LoadTemplates loads and parses all HTML templates.
 func LoadTemplates() (*template.Template, error) {
 	// Define template functions

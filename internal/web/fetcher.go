@@ -714,6 +714,89 @@ func (f *LiveConvoyFetcher) FetchPolecats() ([]PolecatRow, error) {
 	return polecats, nil
 }
 
+// FetchMailQueues fetches all mail queue data from beads.
+func (f *LiveConvoyFetcher) FetchMailQueues() ([]MailQueueRow, error) {
+	// Execute bd list command to get all queue beads
+	listArgs := []string{"list", "--label=gt:queue", "--json"}
+	listCmd := exec.Command("bd", listArgs...)
+	listCmd.Dir = f.townBeads
+
+	var stdout bytes.Buffer
+	listCmd.Stdout = &stdout
+
+	if err := listCmd.Run(); err != nil {
+		return nil, fmt.Errorf("listing queue beads: %w", err)
+	}
+
+	var queues []struct {
+		ID          string `json:"id"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+		CreatedAt   string `json:"created_at"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &queues); err != nil {
+		return nil, fmt.Errorf("parsing queue list: %w", err)
+	}
+
+	// Build queue rows by parsing queue fields from each bead
+	rows := make([]MailQueueRow, 0, len(queues))
+	for _, q := range queues {
+		// Parse the queue fields from the description
+		// Using a simplified parsing inline to avoid importing beads package here
+		fields := parseQueueFieldsInline(q.Description)
+
+		row := MailQueueRow{
+			ID:              q.ID,
+			Name:            fields["name"],
+			ClaimPattern:    fields["claim_pattern"],
+			Status:          fields["status"],
+			MaxConcurrency:  parseIntField(fields["max_concurrency"]),
+			ProcessingOrder: fields["processing_order"],
+			AvailableCount:  parseIntField(fields["available_count"]),
+			ProcessingCount: parseIntField(fields["processing_count"]),
+			CompletedCount:  parseIntField(fields["completed_count"]),
+			FailedCount:     parseIntField(fields["failed_count"]),
+			CreatedBy:       fields["created_by"],
+			CreatedAt:       fields["created_at"],
+		}
+		rows = append(rows, row)
+	}
+
+	return rows, nil
+}
+
+// parseQueueFieldsInline parses queue fields from a description string.
+func parseQueueFieldsInline(description string) map[string]string {
+	fields := make(map[string]string)
+	for _, line := range strings.Split(description, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		colonIdx := strings.Index(line, ":")
+		if colonIdx == -1 {
+			continue
+		}
+
+		key := strings.TrimSpace(line[:colonIdx])
+		value := strings.TrimSpace(line[colonIdx+1:])
+		if value == "null" {
+			value = ""
+		}
+		fields[key] = value
+	}
+	return fields
+}
+
+// parseIntField parses an integer field from a string, returning 0 if invalid.
+func parseIntField(s string) int {
+	var i int
+	fmt.Sscanf(s, "%d", &i)
+	return i
+}
+
 // getPolecatStatusHint captures the last non-empty line from a polecat's pane.
 func (f *LiveConvoyFetcher) getPolecatStatusHint(sessionName string) string {
 	cmd := exec.Command("tmux", "capture-pane", "-t", sessionName, "-p", "-J")
