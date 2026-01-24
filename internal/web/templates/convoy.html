@@ -320,9 +320,21 @@
             opacity: 0;
             transition: opacity 200ms ease-in;
         }
+
+        /* Mail particle system canvas */
+        #mail-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
+    <canvas id="mail-particles"></canvas>
     <div class="dashboard" hx-get="/" hx-trigger="every 10s" hx-swap="outerHTML">
         <header>
             <h1>🚚 Gas Town Convoys</h1>
@@ -454,5 +466,204 @@
         </table>
         {{end}}
     </div>
+
+    <script>
+        // Mail Particle System
+        (function() {
+            const canvas = document.getElementById('mail-particles');
+            const ctx = canvas.getContext('2d');
+
+            // Canvas setup
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // Particle pool for performance
+            class ParticlePool {
+                constructor(size) {
+                    this.pool = [];
+                    this.activeParticles = [];
+                    for (let i = 0; i < size; i++) {
+                        this.pool.push(new MailParticle());
+                    }
+                }
+
+                spawn(startX, startY, endX, endY) {
+                    let particle;
+                    if (this.pool.length > 0) {
+                        particle = this.pool.pop();
+                    } else {
+                        particle = new MailParticle();
+                    }
+                    particle.init(startX, startY, endX, endY);
+                    this.activeParticles.push(particle);
+                    return particle;
+                }
+
+                recycle(particle) {
+                    const index = this.activeParticles.indexOf(particle);
+                    if (index > -1) {
+                        this.activeParticles.splice(index, 1);
+                        this.pool.push(particle);
+                    }
+                }
+
+                update(deltaTime) {
+                    for (let i = this.activeParticles.length - 1; i >= 0; i--) {
+                        const particle = this.activeParticles[i];
+                        particle.update(deltaTime);
+                        if (particle.isDead()) {
+                            this.recycle(particle);
+                        }
+                    }
+                }
+
+                render(ctx) {
+                    this.activeParticles.forEach(p => p.render(ctx));
+                }
+            }
+
+            // Mail particle with arc trajectory physics
+            class MailParticle {
+                constructor() {
+                    this.x = 0;
+                    this.y = 0;
+                    this.startX = 0;
+                    this.startY = 0;
+                    this.endX = 0;
+                    this.endY = 0;
+                    this.progress = 0;
+                    this.duration = 2.0; // seconds
+                    this.arcHeight = 100; // pixels
+                    this.alive = false;
+                }
+
+                init(startX, startY, endX, endY) {
+                    this.startX = startX;
+                    this.startY = startY;
+                    this.endX = endX;
+                    this.endY = endY;
+                    this.progress = 0;
+                    this.alive = true;
+
+                    // Randomize duration and arc height slightly
+                    this.duration = 1.5 + Math.random() * 1.0;
+                    const distance = Math.sqrt(
+                        Math.pow(endX - startX, 2) +
+                        Math.pow(endY - startY, 2)
+                    );
+                    this.arcHeight = Math.min(150, distance * 0.3);
+                }
+
+                update(deltaTime) {
+                    if (!this.alive) return;
+
+                    this.progress += deltaTime / this.duration;
+                    if (this.progress >= 1.0) {
+                        this.alive = false;
+                        return;
+                    }
+
+                    // Calculate position along arc trajectory
+                    const t = this.progress;
+
+                    // Linear interpolation for x
+                    this.x = this.startX + (this.endX - this.startX) * t;
+
+                    // Parabolic arc for y (creates the arc effect)
+                    const linearY = this.startY + (this.endY - this.startY) * t;
+                    const arcOffset = -this.arcHeight * Math.sin(Math.PI * t);
+                    this.y = linearY + arcOffset;
+                }
+
+                render(ctx) {
+                    if (!this.alive) return;
+
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+
+                    // Calculate rotation based on velocity direction
+                    const nextT = Math.min(1.0, this.progress + 0.01);
+                    const nextX = this.startX + (this.endX - this.startX) * nextT;
+                    const nextLinearY = this.startY + (this.endY - this.startY) * nextT;
+                    const nextArcOffset = -this.arcHeight * Math.sin(Math.PI * nextT);
+                    const nextY = nextLinearY + nextArcOffset;
+
+                    const angle = Math.atan2(nextY - this.y, nextX - this.x);
+                    ctx.rotate(angle);
+
+                    // Draw simple envelope sprite (rectangle with triangle flap)
+                    const width = 20;
+                    const height = 14;
+
+                    // Envelope body
+                    ctx.fillStyle = '#eee';
+                    ctx.fillRect(-width/2, -height/2, width, height);
+
+                    // Envelope border
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(-width/2, -height/2, width, height);
+
+                    // Triangle flap
+                    ctx.fillStyle = '#ddd';
+                    ctx.beginPath();
+                    ctx.moveTo(-width/2, -height/2);
+                    ctx.lineTo(0, 0);
+                    ctx.lineTo(width/2, -height/2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+
+                isDead() {
+                    return !this.alive;
+                }
+            }
+
+            // Initialize particle pool
+            const particlePool = new ParticlePool(50);
+
+            // Animation loop
+            let lastTime = performance.now();
+            function animate(currentTime) {
+                const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+                lastTime = currentTime;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Update and render particles
+                particlePool.update(deltaTime);
+                particlePool.render(ctx);
+
+                requestAnimationFrame(animate);
+            }
+            animate(lastTime);
+
+            // Demo: Spawn particles periodically for testing
+            // TODO: Replace with actual mail event triggers
+            function spawnDemoParticle() {
+                const startX = Math.random() * canvas.width;
+                const startY = Math.random() * canvas.height;
+                const endX = Math.random() * canvas.width;
+                const endY = Math.random() * canvas.height;
+                particlePool.spawn(startX, startY, endX, endY);
+            }
+
+            // Spawn a demo particle every 2 seconds
+            setInterval(spawnDemoParticle, 2000);
+
+            // Expose API for external triggering
+            window.spawnMailParticle = function(startX, startY, endX, endY) {
+                particlePool.spawn(startX, startY, endX, endY);
+            };
+        })();
+    </script>
 </body>
 </html>
