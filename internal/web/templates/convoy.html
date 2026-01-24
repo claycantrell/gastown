@@ -496,14 +496,32 @@
     // Gas Town Building Sprite Renderer
     // Based on specs in docs/GASTOWN_SPRITE_SPECS.md
     (function() {
-        const app = new PIXI.Application({
-            width: 800,
-            height: 650,
-            backgroundColor: 0x1a1a2e,
-            antialias: true
-        });
+        try {
+            // Check if PixiJS is loaded
+            if (typeof PIXI === 'undefined') {
+                console.error('[Building Sprite] PixiJS library not loaded');
+                return;
+            }
+            console.log('[Building Sprite] PixiJS loaded successfully');
 
-        document.getElementById('gastown-canvas').appendChild(app.view);
+            console.log('[Building Sprite] Initializing PixiJS application...');
+            const app = new PIXI.Application({
+                width: 800,
+                height: 650,
+                backgroundColor: 0x1a1a2e,
+                antialias: true
+            });
+            console.log('[Building Sprite] PixiJS application created');
+
+            const container = document.getElementById('gastown-canvas');
+            if (!container) {
+                console.error('[Building Sprite] Canvas container element not found: #gastown-canvas');
+                return;
+            }
+
+            console.log('[Building Sprite] Canvas container found, appending canvas...');
+            container.appendChild(app.view);
+            console.log('[Building Sprite] Canvas appended successfully');
 
         // Building specifications
         const buildings = [
@@ -597,48 +615,76 @@
             app.stage.addChild(graphics);
             app.stage.addChild(label);
         });
+
+        console.log('[Building Sprite] Rendered', buildings.length, 'buildings');
+
+        } catch (error) {
+            console.error('[Building Sprite] Error initializing building sprite renderer:', error);
+            console.error('[Building Sprite] Stack trace:', error.stack);
+        }
     })();
 
 
     // War Rig Animation using PixiJS
     (function() {
-        // Read convoy data from the page
-        function getConvoyData() {
-            const convoys = [];
-            const rows = document.querySelectorAll('.convoy-table tbody tr');
-            rows.forEach(row => {
-                const id = row.querySelector('.convoy-id')?.textContent?.trim();
-                const title = row.querySelector('.convoy-title')?.textContent?.trim();
-                const status = row.querySelector('.work-status')?.textContent?.trim();
-                const progress = row.querySelector('.progress')?.textContent?.trim();
+        try {
+            // Check if PixiJS is loaded
+            if (typeof PIXI === 'undefined') {
+                console.error('[War Rig] PixiJS library not loaded');
+                return;
+            }
+            console.log('[War Rig] PixiJS loaded successfully, version:', PIXI.VERSION);
 
-                if (id && status) {
-                    const [completed, total] = progress?.split('/').map(n => parseInt(n)) || [0, 1];
-                    convoys.push({
-                        id,
-                        title,
-                        status: status.toLowerCase(),
-                        completed,
-                        total,
-                        progress: total > 0 ? completed / total : 0
-                    });
-                }
+            // Read convoy data from the page
+            function getConvoyData() {
+                const convoys = [];
+                const rows = document.querySelectorAll('.convoy-table tbody tr');
+                console.log('[War Rig] Found', rows.length, 'convoy table rows');
+
+                rows.forEach((row, index) => {
+                    const id = row.querySelector('.convoy-id')?.textContent?.trim();
+                    const title = row.querySelector('.convoy-title')?.textContent?.trim();
+                    const status = row.querySelector('.work-status')?.textContent?.trim();
+                    const progress = row.querySelector('.progress')?.textContent?.trim();
+
+                    if (id && status) {
+                        const [completed, total] = progress?.split('/').map(n => parseInt(n)) || [0, 1];
+                        const convoy = {
+                            id,
+                            title,
+                            status: status.toLowerCase(),
+                            completed,
+                            total,
+                            progress: total > 0 ? completed / total : 0
+                        };
+                        convoys.push(convoy);
+                        console.log('[War Rig] Convoy', index, ':', convoy);
+                    }
+                });
+
+                console.log('[War Rig] Total convoys extracted:', convoys.length);
+                return convoys;
+            }
+
+            // Initialize PixiJS application
+            console.log('[War Rig] Initializing PixiJS application...');
+            const app = new PIXI.Application({
+                width: 1200,
+                height: 300,
+                backgroundColor: 0x0a0a14,
+                antialias: true
             });
-            return convoys;
-        }
+            console.log('[War Rig] PixiJS application created');
 
-        // Initialize PixiJS application
-        const app = new PIXI.Application({
-            width: 1200,
-            height: 300,
-            backgroundColor: 0x0a0a14,
-            antialias: true
-        });
+            const container = document.getElementById('war-rig-canvas');
+            if (!container) {
+                console.error('[War Rig] Canvas container element not found: #war-rig-canvas');
+                return;
+            }
 
-        const container = document.getElementById('war-rig-canvas');
-        if (container) {
+            console.log('[War Rig] Canvas container found, appending canvas...');
             container.appendChild(app.view);
-        }
+            console.log('[War Rig] Canvas appended successfully, dimensions:', app.view.width, 'x', app.view.height);
 
         // Building positions (representing different rigs)
         const buildings = [
@@ -770,8 +816,12 @@
                 rig.sprite.rotation = angle;
             });
         });
+
+        } catch (error) {
+            console.error('[War Rig] Error initializing war rig animation:', error);
+            console.error('[War Rig] Stack trace:', error.stack);
+        }
     })();
->>>>>>> origin/polecat/dementus/gt-56m@mkrtcr4j
     </script>
 </body>
 </html>
