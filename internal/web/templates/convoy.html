@@ -453,6 +453,477 @@
             </tbody>
         </table>
         {{end}}
+
+        <h2 class="section-header">🏜️ Gas Town World</h2>
+        <div id="world-renderer"></div>
     </div>
+
+    <script src="https://pixijs.download/release/pixi.js"></script>
+    <script>
+    // Gas Town World Renderer using PixiJS
+    (function() {
+        try {
+            if (typeof PIXI === 'undefined') {
+                console.error('[World] PixiJS not loaded');
+                return;
+            }
+
+            console.log('[World] Init, PixiJS', PIXI.VERSION);
+
+            // Extract data from page
+            function getConvoys() {
+                const convoys = [];
+                document.querySelectorAll('.convoy-table tbody tr').forEach(row => {
+                    const id = row.querySelector('.convoy-id')?.textContent?.trim();
+                    const status = row.querySelector('.work-status')?.textContent?.trim().toLowerCase();
+                    const progress = row.querySelector('.progress')?.textContent?.trim() || '0/1';
+                    if (id && status) {
+                        const [done, total] = progress.split('/').map(n => parseInt(n) || 0);
+                        convoys.push({ id, status, progress: total > 0 ? done / total : 0 });
+                    }
+                });
+                return convoys;
+            }
+
+            function getPolecats() {
+                const polecats = [];
+                const tables = document.querySelectorAll('.convoy-table');
+                if (tables.length < 2) return polecats;
+
+                tables[tables.length - 1].querySelectorAll('tbody tr').forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 4) {
+                        const name = cells[0].textContent.trim();
+                        const rig = cells[1].textContent.trim();
+                        const actClass = cells[2].className;
+                        const hint = cells[3].textContent.trim();
+                        let status = 'unknown';
+                        if (actClass.includes('activity-green')) status = 'active';
+                        else if (actClass.includes('activity-yellow')) status = 'stale';
+                        else if (actClass.includes('activity-red')) status = 'stuck';
+                        polecats.push({ name, rig, status, hint });
+                    }
+                });
+                return polecats;
+            }
+
+            const app = new PIXI.Application({
+                width: 1200,
+                height: 800,
+                backgroundColor: 0x0a0a14,
+                antialias: true
+            });
+
+            const container = document.getElementById('world-renderer');
+            if (!container) {
+                console.error('[World] Container not found');
+                return;
+            }
+            container.appendChild(app.view);
+
+            // Sprite factory
+            function hex(size, color) {
+                const g = new PIXI.Graphics();
+                g.lineStyle(3, color, 0.8);
+                g.beginFill(color, 0.3);
+                const pts = [];
+                for (let i = 0; i < 6; i++) {
+                    const a = (Math.PI / 3) * i;
+                    pts.push(Math.cos(a) * size, Math.sin(a) * size);
+                }
+                g.drawPolygon(pts);
+                g.endFill();
+                return g;
+            }
+
+            function tri(size, color) {
+                const g = new PIXI.Graphics();
+                g.lineStyle(3, color, 0.8);
+                g.beginFill(color, 0.3);
+                const h = size * Math.sqrt(3) / 2;
+                g.moveTo(0, -h * 0.6);
+                g.lineTo(-size / 2, h * 0.4);
+                g.lineTo(size / 2, h * 0.4);
+                g.closePath();
+                g.endFill();
+                return g;
+            }
+
+            function sq(size, color) {
+                const g = new PIXI.Graphics();
+                g.lineStyle(3, color, 0.8);
+                g.beginFill(color, 0.3);
+                g.drawRect(-size / 2, -size / 2, size, size);
+                g.endFill();
+                return g;
+            }
+
+            function pent(size, color) {
+                const g = new PIXI.Graphics();
+                g.lineStyle(3, color, 0.8);
+                g.beginFill(color, 0.3);
+                const pts = [];
+                for (let i = 0; i < 5; i++) {
+                    const a = (Math.PI * 2 / 5) * i - Math.PI / 2;
+                    pts.push(Math.cos(a) * size, Math.sin(a) * size);
+                }
+                g.drawPolygon(pts);
+                g.endFill();
+                return g;
+            }
+
+            function circ(size, color) {
+                const g = new PIXI.Graphics();
+                g.lineStyle(3, color, 0.8);
+                g.beginFill(color, 0.3);
+                g.drawCircle(0, 0, size / 2);
+                g.endFill();
+                return g;
+            }
+
+            function label(text, color, size = 14) {
+                const t = new PIXI.Text(text, {
+                    fontSize: size,
+                    fill: color,
+                    fontFamily: 'SF Mono, Monaco, monospace',
+                    fontWeight: 500
+                });
+                t.anchor.set(0.5);
+                return t;
+            }
+
+            const C = {
+                mayor: 0xfacc15,
+                witness: 0x4ade80,
+                deacon: 0x60a5fa,
+                refinery: 0xf87171,
+                polecat: 0xa78bfa
+            };
+
+            // Layout
+            const L = {
+                mayor: { x: 600, y: 400 },
+                rigs: {
+                    gastown: {
+                        c: { x: 600, y: 150 },
+                        w: { x: 500, y: 100 },
+                        d: { x: 700, y: 100 },
+                        r: { x: 600, y: 50 }
+                    },
+                    claycantrell: {
+                        c: { x: 950, y: 400 },
+                        w: { x: 1000, y: 350 },
+                        d: { x: 1050, y: 450 },
+                        r: { x: 1100, y: 400 }
+                    },
+                    longeye: {
+                        c: { x: 600, y: 650 },
+                        w: { x: 500, y: 700 },
+                        d: { x: 700, y: 700 },
+                        r: { x: 600, y: 750 }
+                    },
+                    beads: {
+                        c: { x: 250, y: 400 },
+                        w: { x: 200, y: 350 },
+                        d: { x: 150, y: 450 },
+                        r: { x: 100, y: 400 }
+                    }
+                }
+            };
+
+            const buildings = {};
+            const polecatSprites = [];
+            const warRigs = [];
+
+            // Mayor
+            const mayor = hex(80, C.mayor);
+            mayor.position.set(L.mayor.x, L.mayor.y);
+            mayor.interactive = true;
+            mayor.buttonMode = true;
+            mayor.on('pointerdown', () => alert('🏛️ Mayor\nCentral coordinator'));
+            app.stage.addChild(mayor);
+            const mayorLbl = label('MAYOR', C.mayor, 16);
+            mayorLbl.position.set(L.mayor.x, L.mayor.y + 100);
+            app.stage.addChild(mayorLbl);
+            buildings.mayor = mayor;
+
+            // Rigs
+            Object.entries(L.rigs).forEach(([rig, pos]) => {
+                buildings[rig] = {};
+
+                const w = tri(70, C.witness);
+                w.position.set(pos.w.x, pos.w.y);
+                w.interactive = true;
+                w.buttonMode = true;
+                w.on('pointerdown', () => alert(`👁️ Witness (${rig})\nMonitors polecat health`));
+                app.stage.addChild(w);
+                buildings[rig].witness = w;
+                const wLbl = label(`${rig}\nWitness`, C.witness, 12);
+                wLbl.position.set(pos.w.x, pos.w.y + 60);
+                app.stage.addChild(wLbl);
+
+                const d = sq(60, C.deacon);
+                d.position.set(pos.d.x, pos.d.y);
+                d.interactive = true;
+                d.buttonMode = true;
+                d.on('pointerdown', () => alert(`📬 Deacon (${rig})\nMail delivery`));
+                app.stage.addChild(d);
+                buildings[rig].deacon = d;
+                const dLbl = label('Deacon', C.deacon, 12);
+                dLbl.position.set(pos.d.x, pos.d.y + 50);
+                app.stage.addChild(dLbl);
+
+                const r = pent(75, C.refinery);
+                r.position.set(pos.r.x, pos.r.y);
+                r.interactive = true;
+                r.buttonMode = true;
+                r.on('pointerdown', () => alert(`🔥 Refinery (${rig})\nMerge queue processor`));
+                app.stage.addChild(r);
+                buildings[rig].refinery = r;
+                const rLbl = label('Refinery', C.refinery, 12);
+                rLbl.position.set(pos.r.x, pos.r.y + 60);
+                app.stage.addChild(rLbl);
+            });
+
+            // Polecats
+            getPolecats().forEach((pc, i) => {
+                const rigName = pc.rig.toLowerCase().replace('/', '');
+                if (!L.rigs[rigName]) return;
+
+                const base = L.rigs[rigName].w;
+                const angle = i * Math.PI * 0.3;
+                const dist = 120;
+                const x = base.x + Math.cos(angle) * dist;
+                const y = base.y + Math.sin(angle) * dist;
+
+                const colors = { active: C.polecat, stale: 0xfacc15, stuck: 0xf87171, unknown: 0xaaaaaa };
+                const color = colors[pc.status] || colors.unknown;
+
+                const s = circ(50, color);
+                s.position.set(x, y);
+                s.interactive = true;
+                s.buttonMode = true;
+                s.on('pointerdown', () => alert(`🐾 ${pc.name}\nRig: ${pc.rig}\nStatus: ${pc.status}\n\n${pc.hint}`));
+                app.stage.addChild(s);
+
+                const lbl = label(pc.name, color, 10);
+                lbl.position.set(x, y + 40);
+                app.stage.addChild(lbl);
+
+                polecatSprites.push({ sprite: s, label: lbl, data: pc, base: { x, y } });
+            });
+
+            // War rigs (convoys)
+            getConvoys().forEach((convoy, i) => {
+                const rigNames = Object.keys(L.rigs);
+                const targetRig = rigNames[i % rigNames.length];
+                const from = L.mayor;
+                const to = L.rigs[targetRig].c;
+
+                const colors = { active: 0x4ade80, stale: 0xfacc15, stuck: 0xf87171, complete: 0x10b981 };
+                const color = colors[convoy.status] || 0xaaaaaa;
+
+                const rig = new PIXI.Graphics();
+                rig.beginFill(color);
+                rig.drawRect(-15, -8, 12, 16);
+                rig.endFill();
+                rig.beginFill(color, 0.8);
+                rig.drawRect(0, -6, 20, 12);
+                rig.endFill();
+                rig.beginFill(0x333333);
+                rig.drawCircle(-10, 8, 3);
+                rig.drawCircle(5, 8, 3);
+                rig.drawCircle(15, 8, 3);
+                rig.endFill();
+                rig.beginFill(0xffffff, 0.3);
+                rig.drawRect(1, -5, 18 * convoy.progress, 10);
+                rig.endFill();
+
+                rig.position.set(from.x, from.y - 80);
+                app.stage.addChild(rig);
+
+                const lbl = label(convoy.id, color, 10);
+                lbl.position.set(0, -20);
+                rig.addChild(lbl);
+
+                warRigs.push({
+                    sprite: rig,
+                    from,
+                    to,
+                    progress: 0,
+                    speed: 0.002 + Math.random() * 0.001,
+                    convoy
+                });
+            });
+
+            // Message particles (flying between buildings)
+            const messages = [];
+            function createMessage(from, to, color) {
+                const msg = new PIXI.Graphics();
+                msg.beginFill(color, 0.8);
+                msg.drawCircle(0, 0, 4);
+                msg.endFill();
+                msg.position.set(from.x, from.y);
+                app.stage.addChild(msg);
+
+                messages.push({
+                    sprite: msg,
+                    from,
+                    to,
+                    progress: 0,
+                    speed: 0.02,
+                    color
+                });
+            }
+
+            // Spawn initial messages
+            const rigNames = Object.keys(L.rigs);
+            setInterval(() => {
+                // Random message from Mayor to rig Witness
+                const targetRig = rigNames[Math.floor(Math.random() * rigNames.length)];
+                createMessage(L.mayor, L.rigs[targetRig].w, 0x60a5fa);
+
+                // Random message between Deacons
+                const rig1 = rigNames[Math.floor(Math.random() * rigNames.length)];
+                const rig2 = rigNames[Math.floor(Math.random() * rigNames.length)];
+                if (rig1 !== rig2) {
+                    createMessage(L.rigs[rig1].d, L.rigs[rig2].d, 0xa78bfa);
+                }
+            }, 3000);
+
+            // WebSocket integration for real-time updates
+            function setupWebSocket() {
+                const wsUrl = `ws://${window.location.host}/ws`;
+                console.log('[World] Attempting WebSocket connection:', wsUrl);
+
+                try {
+                    const ws = new WebSocket(wsUrl);
+
+                    ws.onopen = () => {
+                        console.log('[World] WebSocket connected');
+                    };
+
+                    ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            console.log('[World] WebSocket message:', data);
+
+                            // Handle different event types
+                            switch(data.type) {
+                                case 'polecat_status':
+                                    // Update polecat sprite status
+                                    const pc = polecatSprites.find(p => p.data.name === data.polecat);
+                                    if (pc) {
+                                        pc.data.status = data.status;
+                                        // Update color based on new status
+                                        const colors = { active: C.polecat, stale: 0xfacc15, stuck: 0xf87171 };
+                                        const newColor = colors[data.status] || 0xaaaaaa;
+                                        pc.sprite.tint = newColor;
+                                    }
+                                    break;
+
+                                case 'convoy_progress':
+                                    // Update war rig progress
+                                    const convoy = warRigs.find(r => r.convoy.id === data.convoy_id);
+                                    if (convoy) {
+                                        convoy.convoy.progress = data.progress;
+                                    }
+                                    break;
+
+                                case 'message':
+                                    // Create visual message animation
+                                    const fromRig = data.from_rig;
+                                    const toRig = data.to_rig;
+                                    if (L.rigs[fromRig] && L.rigs[toRig]) {
+                                        createMessage(L.rigs[fromRig].d, L.rigs[toRig].d, 0x60a5fa);
+                                    }
+                                    break;
+
+                                case 'refinery_event':
+                                    // Pulse the refinery building
+                                    const refRig = data.rig;
+                                    if (buildings[refRig] && buildings[refRig].refinery) {
+                                        buildings[refRig].refinery.scale.set(1.5, 1.5);
+                                    }
+                                    break;
+
+                                default:
+                                    console.log('[World] Unknown WebSocket event type:', data.type);
+                            }
+                        } catch (e) {
+                            console.error('[World] WebSocket message parse error:', e);
+                        }
+                    };
+
+                    ws.onerror = (error) => {
+                        console.warn('[World] WebSocket error:', error);
+                    };
+
+                    ws.onclose = () => {
+                        console.log('[World] WebSocket closed, retrying in 5s');
+                        setTimeout(setupWebSocket, 5000);
+                    };
+                } catch (e) {
+                    console.warn('[World] WebSocket setup failed (endpoint may not be available yet):', e);
+                }
+            }
+
+            // Try to connect to WebSocket (graceful fallback if not available)
+            setupWebSocket();
+
+            // Animation
+            app.ticker.add(delta => {
+                // Animate messages
+                messages.forEach((msg, idx) => {
+                    msg.progress += msg.speed * delta;
+                    if (msg.progress >= 1) {
+                        app.stage.removeChild(msg.sprite);
+                        messages.splice(idx, 1);
+                    } else {
+                        const x = msg.from.x + (msg.to.x - msg.from.x) * msg.progress;
+                        const y = msg.from.y + (msg.to.y - msg.from.y) * msg.progress;
+                        msg.sprite.position.set(x, y);
+                        msg.sprite.alpha = 1 - msg.progress;
+                    }
+                });
+
+
+                warRigs.forEach(rig => {
+                    rig.progress += rig.speed * delta;
+                    if (rig.progress > 1) {
+                        rig.progress = 0;
+                        [rig.from, rig.to] = [rig.to, rig.from];
+                    }
+                    const x = rig.from.x + (rig.to.x - rig.from.x) * rig.progress;
+                    const y = rig.from.y + (rig.to.y - rig.from.y) * rig.progress - Math.sin(rig.progress * Math.PI) * 30;
+                    rig.sprite.position.set(x, y);
+                    rig.sprite.rotation = Math.atan2(rig.to.y - rig.from.y, rig.to.x - rig.from.x);
+                });
+
+                polecatSprites.forEach((pc, i) => {
+                    const pulse = Math.sin(Date.now() / 1000 + i) * 0.1 + 1;
+                    pc.sprite.scale.set(pulse, pulse);
+                });
+
+                Object.values(buildings).forEach((b, i) => {
+                    if (b.position) {
+                        const pulse = Math.sin(Date.now() / 2000 + i) * 0.05 + 1;
+                        b.scale.set(pulse, pulse);
+                    } else {
+                        Object.values(b).forEach((sub, j) => {
+                            const pulse = Math.sin(Date.now() / 2000 + i + j * 0.5) * 0.05 + 1;
+                            sub.scale.set(pulse, pulse);
+                        });
+                    }
+                });
+            });
+
+            console.log('[World] Ready');
+
+        } catch (e) {
+            console.error('[World] Error:', e);
+        }
+    })();
+    </script>
 </body>
 </html>
