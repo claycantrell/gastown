@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gas Town World Map</title>
+    <style>
+        :root {
+            --bg-dark: #1a1a2e;
+            --text-primary: #eee;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #worldCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="worldCanvas"></canvas>
+
+    <script>
+        // Get canvas and context
+        const canvas = document.getElementById('worldCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set up fullscreen canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // Initialize canvas size
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Coordinate system: origin at center, +x right, +y down
+        function toScreenX(worldX) {
+            return canvas.width / 2 + worldX;
+        }
+
+        function toScreenY(worldY) {
+            return canvas.height / 2 + worldY;
+        }
+
+        // Clear canvas
+        function clear() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Draw coordinate system axes (for testing)
+        function drawAxes() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+
+            // X axis
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+
+            // Y axis
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+
+            // Origin marker
+            ctx.fillStyle = '#4ade80';
+            ctx.beginPath();
+            ctx.arc(toScreenX(0), toScreenY(0), 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Animation state
+        let lastFrameTime = 0;
+
+        // Main render function
+        function render(timestamp) {
+            // Calculate delta time
+            const deltaTime = timestamp - lastFrameTime;
+            lastFrameTime = timestamp;
+
+            // Clear screen
+            clear();
+
+            // Draw coordinate axes (will be replaced with actual world map)
+            drawAxes();
+
+            // Continue animation loop
+            requestAnimationFrame(render);
+        }
+
+        // Start animation loop
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>
