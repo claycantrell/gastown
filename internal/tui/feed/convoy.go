@@ -279,6 +279,7 @@ func (m *Model) renderConvoys() string {
 	}
 
 	var lines []string
+	pos := 0
 
 	// In Progress section
 	lines = append(lines, ConvoySectionStyle.Render("IN PROGRESS"))
@@ -286,7 +287,16 @@ func (m *Model) renderConvoys() string {
 		lines = append(lines, "  "+AgentIdleStyle.Render("No active convoys"))
 	} else {
 		for _, c := range m.convoyState.InProgress {
-			lines = append(lines, renderConvoyLine(c, false))
+			lines = append(lines, m.renderConvoyLine(c, false, pos))
+			pos++
+
+			// Render expanded details if convoy is expanded
+			if m.expandedConvoys[c.ID] {
+				details := m.renderConvoyDetails(c.ID)
+				if details != "" {
+					lines = append(lines, details)
+				}
+			}
 		}
 	}
 
@@ -298,7 +308,16 @@ func (m *Model) renderConvoys() string {
 		lines = append(lines, "  "+AgentIdleStyle.Render("No recent landings"))
 	} else {
 		for _, c := range m.convoyState.Landed {
-			lines = append(lines, renderConvoyLine(c, true))
+			lines = append(lines, m.renderConvoyLine(c, true, pos))
+			pos++
+
+			// Render expanded details if convoy is expanded
+			if m.expandedConvoys[c.ID] {
+				details := m.renderConvoyDetails(c.ID)
+				if details != "" {
+					lines = append(lines, details)
+				}
+			}
 		}
 	}
 
@@ -306,29 +325,137 @@ func (m *Model) renderConvoys() string {
 }
 
 // renderConvoyLine renders a single convoy status line
-func renderConvoyLine(c Convoy, landed bool) string {
+func (m *Model) renderConvoyLine(c Convoy, landed bool, pos int) string {
 	// Format: "  hq-xyz  Title       2/4 ●●○○" or "  hq-xyz  Title       ✓ 2h ago"
+
+	// Expand/collapse indicator
+	expandIcon := ""
+	if m.focusedPanel == PanelConvoy {
+		if m.expandedConvoys[c.ID] {
+			expandIcon = "▼ "
+		} else {
+			expandIcon = "▶ "
+		}
+	}
+
 	id := ConvoyIDStyle.Render(c.ID)
 
 	// Truncate title if too long
 	title := c.Title
-	if len(title) > 20 {
-		title = title[:17] + "..."
+	titleMaxLen := 20
+	if m.focusedPanel == PanelConvoy {
+		titleMaxLen = 18 // Make room for expand icon
 	}
-	title = ConvoyNameStyle.Render(title)
+	if len(title) > titleMaxLen {
+		title = title[:titleMaxLen-3] + "..."
+	}
 
+	var line string
 	if landed {
 		// Show checkmark and time since landing
 		age := formatAge(time.Since(c.ClosedAt))
 		status := ConvoyLandedStyle.Render("✓") + " " + ConvoyAgeStyle.Render(age+" ago")
-		return fmt.Sprintf("  %s  %-20s  %s", id, title, status)
+		line = fmt.Sprintf("  %s%s  %-20s  %s", expandIcon, id, title, status)
+	} else {
+		// Show progress bar
+		progress := renderProgressBar(c.Completed, c.Total)
+		count := ConvoyProgressStyle.Render(fmt.Sprintf("%d/%d", c.Completed, c.Total))
+		line = fmt.Sprintf("  %s%s  %-20s  %s %s", expandIcon, id, title, count, progress)
 	}
 
-	// Show progress bar
-	progress := renderProgressBar(c.Completed, c.Total)
-	count := ConvoyProgressStyle.Render(fmt.Sprintf("%d/%d", c.Completed, c.Total))
-	return fmt.Sprintf("  %s  %-20s  %s %s", id, title, count, progress)
+	// Apply selection style if this convoy is selected
+	if m.focusedPanel == PanelConvoy && pos == m.convoyCursor {
+		return SelectedStyle.Render(line)
+	}
+
+	return line
 }
+
+// renderConvoyDetails renders expanded details for a convoy
+func (m *Model) renderConvoyDetails(convoyID string) string {
+	details, ok := m.convoyDetailsCache[convoyID]
+	if !ok {
+		return ""
+	}
+
+	var lines []string
+	baseIndent := "    "
+
+	// Status
+	lines = append(lines, baseIndent+DetailKeyStyle.Render("Status: ")+DetailValueStyle.Render(details.Status))
+
+	// Created/Closed times
+	if !details.CreatedAt.IsZero() {
+		age := formatAge(time.Since(details.CreatedAt))
+		lines = append(lines, baseIndent+DetailKeyStyle.Render("Created: ")+DetailValueDimStyle.Render(age+" ago"))
+	}
+	if !details.ClosedAt.IsZero() {
+		age := formatAge(time.Since(details.ClosedAt))
+		lines = append(lines, baseIndent+DetailKeyStyle.Render("Closed: ")+DetailValueDimStyle.Render(age+" ago"))
+	}
+
+	// Progress
+	percentage := 0
+	if details.Total > 0 {
+		percentage = (details.Completed * 100) / details.Total
+	}
+	lines = append(lines, baseIndent+DetailKeyStyle.Render("Progress: ")+DetailValueStyle.Render(fmt.Sprintf("%d of %d issues completed (%d%%)", details.Completed, details.Total, percentage)))
+
+	// Tracked issues (show first few)
+	if len(details.TrackedIssues) > 0 {
+		lines = append(lines, baseIndent+DetailKeyStyle.Render("Tracked Issues:"))
+		maxIssues := len(details.TrackedIssues)
+		if maxIssues > 5 {
+			maxIssues = 5 // Limit to first 5
+		}
+		for i := 0; i < maxIssues; i++ {
+			issue := details.TrackedIssues[i]
+			connector := "├─"
+			if i == maxIssues-1 && len(details.TrackedIssues) <= 5 {
+				connector = "└─"
+			}
+
+			statusIcon := "○"
+			statusStyle := issueOpenStyle
+			if issue.Status == "closed" {
+				statusIcon = "✓"
+				statusStyle = issueClosedStyle
+			} else if issue.Status == "in_progress" {
+				statusIcon = "▶"
+			}
+
+			issueTitle := issue.Title
+			if len(issueTitle) > 40 {
+				issueTitle = issueTitle[:37] + "..."
+			}
+
+			workerInfo := ""
+			if issue.Worker != "" {
+				workerInfo = fmt.Sprintf(" @%s", issue.Worker)
+				if issue.WorkerAge != "" {
+					workerInfo += fmt.Sprintf(" (%s)", issue.WorkerAge)
+				}
+			}
+
+			issueLine := fmt.Sprintf("%s  %s %s %s: %s%s", baseIndent, connector, statusIcon, issue.ID, issueTitle, workerInfo)
+			lines = append(lines, statusStyle.Render(issueLine))
+		}
+
+		if len(details.TrackedIssues) > 5 {
+			lines = append(lines, baseIndent+DetailValueDimStyle.Render(fmt.Sprintf("  ... and %d more", len(details.TrackedIssues)-5)))
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+var (
+	issueOpenStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("11")) // yellow
+
+	issueClosedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("10")) // green
+)
 
 // renderProgressBar creates a simple progress bar: ●●○○
 func renderProgressBar(completed, total int) string {

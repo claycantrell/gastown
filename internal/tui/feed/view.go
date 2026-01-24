@@ -96,6 +96,7 @@ func (m *Model) renderTree() string {
 	}
 	sort.Strings(rigNames)
 
+	pos := 0
 	for _, rigName := range rigNames {
 		rig := m.rigs[rigName]
 
@@ -121,11 +122,22 @@ func (m *Model) renderTree() string {
 
 			// For crew and polecats, show as expandable group
 			if role == "crew" || role == "polecat" {
-				lines = append(lines, m.renderAgentGroup(icon, role, agents))
+				groupLines, newPos := m.renderAgentGroup(icon, role, agents, pos)
+				lines = append(lines, groupLines)
+				pos = newPos
 			} else {
 				// Single agents (mayor, witness, refinery)
 				for _, agent := range agents {
-					lines = append(lines, m.renderAgent(icon, agent, 2))
+					lines = append(lines, m.renderAgent(icon, agent, 2, pos))
+					pos++
+
+					// Render expanded details if agent is expanded
+					if m.expandedAgents[agent.ID] {
+						details := m.renderAgentDetails(agent, 2)
+						if details != "" {
+							lines = append(lines, details)
+						}
+					}
 				}
 			}
 		}
@@ -156,8 +168,9 @@ func (m *Model) groupAgentsByRole(agents map[string]*Agent) map[string][]*Agent 
 }
 
 // renderAgentGroup renders a group of agents (crew or polecats)
-func (m *Model) renderAgentGroup(icon, role string, agents []*Agent) string {
+func (m *Model) renderAgentGroup(icon, role string, agents []*Agent, startPos int) (string, int) {
 	var lines []string
+	pos := startPos
 
 	// Group header
 	plural := role
@@ -169,14 +182,23 @@ func (m *Model) renderAgentGroup(icon, role string, agents []*Agent) string {
 
 	// Individual agents
 	for _, agent := range agents {
-		lines = append(lines, m.renderAgent("", agent, 5))
+		lines = append(lines, m.renderAgent("", agent, 5, pos))
+		pos++
+
+		// Render expanded details if agent is expanded
+		if m.expandedAgents[agent.ID] {
+			details := m.renderAgentDetails(agent, 5)
+			if details != "" {
+				lines = append(lines, details)
+			}
+		}
 	}
 
-	return strings.Join(lines, "\n")
+	return strings.Join(lines, "\n"), pos
 }
 
 // renderAgent renders a single agent line
-func (m *Model) renderAgent(icon string, agent *Agent, indent int) string {
+func (m *Model) renderAgent(icon string, agent *Agent, indent int, pos int) string {
 	prefix := strings.Repeat(" ", indent)
 	if icon != "" && indent >= 2 {
 		prefix = strings.Repeat(" ", indent-2) + icon + " "
@@ -198,19 +220,92 @@ func (m *Model) renderAgent(icon string, agent *Agent, indent int) string {
 		statusIndicator = " →"
 	}
 
-	// Last activity
-	activity := ""
-	if agent.LastEvent != nil {
-		age := formatAge(time.Since(agent.LastEvent.Time))
-		msg := agent.LastEvent.Message
-		if len(msg) > 40 {
-			msg = msg[:37] + "..."
+	// Expand/collapse indicator
+	expandIcon := ""
+	if m.focusedPanel == PanelTree {
+		if m.expandedAgents[agent.ID] {
+			expandIcon = "▼ "
+		} else {
+			expandIcon = "▶ "
 		}
-		activity = fmt.Sprintf(" [%s] %s", age, msg)
 	}
 
-	line := prefix + nameStyle.Render(name+statusIndicator) + TimestampStyle.Render(activity)
+	// Cursor selection
+	var line string
+	if m.focusedPanel == PanelTree && pos == m.treeCursor {
+		// Highlighted when selected
+		line = prefix + SelectedStyle.Render(expandIcon+name+statusIndicator)
+	} else {
+		line = prefix + expandIcon + nameStyle.Render(name+statusIndicator)
+	}
+
+	// Last activity (only on collapsed view)
+	if !m.expandedAgents[agent.ID] {
+		activity := ""
+		if agent.LastEvent != nil {
+			age := formatAge(time.Since(agent.LastEvent.Time))
+			msg := agent.LastEvent.Message
+			if len(msg) > 30 {
+				msg = msg[:27] + "..."
+			}
+			activity = fmt.Sprintf(" [%s] %s", age, msg)
+		}
+		line += TimestampStyle.Render(activity)
+	}
+
 	return line
+}
+
+// renderAgentDetails renders expanded details for an agent
+func (m *Model) renderAgentDetails(agent *Agent, indent int) string {
+	details, ok := m.agentDetailsCache[agent.ID]
+	if !ok {
+		return ""
+	}
+
+	var lines []string
+	baseIndent := strings.Repeat(" ", indent+2)
+
+	// Status
+	runningStatus := "stopped"
+	if details.Running {
+		runningStatus = "running"
+	}
+	lines = append(lines, baseIndent+DetailKeyStyle.Render("Status: ")+DetailValueStyle.Render(fmt.Sprintf("%s (%s)", details.State, runningStatus)))
+
+	// Work (if any)
+	if details.WorkTitle != "" {
+		workLine := details.WorkTitle
+		if len(workLine) > 50 {
+			workLine = workLine[:47] + "..."
+		}
+		lines = append(lines, baseIndent+DetailKeyStyle.Render("Work: ")+DetailValueStyle.Render(workLine))
+		if details.HookBead != "" {
+			lines = append(lines, baseIndent+"      "+DetailValueDimStyle.Render(details.HookBead))
+		}
+	}
+
+	// Branch (if any)
+	if details.Branch != "" {
+		lines = append(lines, baseIndent+DetailKeyStyle.Render("Branch: ")+DetailValueStyle.Render(details.Branch))
+	}
+
+	// Mail (if any)
+	if details.UnreadMail > 0 {
+		mailInfo := fmt.Sprintf("%d unread", details.UnreadMail)
+		if details.FirstSubject != "" {
+			mailInfo += fmt.Sprintf(" → \"%s\"", details.FirstSubject)
+		}
+		lines = append(lines, baseIndent+DetailKeyStyle.Render("Mail: ")+DetailValueStyle.Render(mailInfo))
+	}
+
+	// Age
+	if !details.UpdatedAt.IsZero() {
+		age := formatAge(time.Since(details.UpdatedAt))
+		lines = append(lines, baseIndent+DetailKeyStyle.Render("Last Activity: ")+DetailValueDimStyle.Render(age+" ago"))
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // renderFeed renders the event feed content
@@ -332,9 +427,9 @@ func (m *Model) renderStatusBar() string {
 // renderShortHelp renders abbreviated key hints
 func (m *Model) renderShortHelp() string {
 	hints := []string{
-		HelpKeyStyle.Render("j/k") + HelpDescStyle.Render(":scroll"),
+		HelpKeyStyle.Render("j/k") + HelpDescStyle.Render(":navigate"),
+		HelpKeyStyle.Render("enter") + HelpDescStyle.Render(":expand"),
 		HelpKeyStyle.Render("tab") + HelpDescStyle.Render(":switch"),
-		HelpKeyStyle.Render("/") + HelpDescStyle.Render(":search"),
 		HelpKeyStyle.Render("q") + HelpDescStyle.Render(":quit"),
 		HelpKeyStyle.Render("?") + HelpDescStyle.Render(":help"),
 	}

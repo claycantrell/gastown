@@ -51,6 +51,45 @@ type Rig struct {
 	Expanded bool
 }
 
+// AgentDetails contains detailed information about an agent
+type AgentDetails struct {
+	Name          string
+	Role          string
+	State         string    // working, done, stuck
+	Running       bool      // Is tmux session alive?
+	HookBead      string    // Pinned bead ID
+	WorkTitle     string    // Title of pinned work
+	Branch        string    // Current git branch
+	CleanupStatus string    // Git cleanup status
+	UnreadMail    int       // Number of unread messages
+	FirstSubject  string    // Subject of first unread
+	CreatedAt     time.Time // When agent was created
+	UpdatedAt     time.Time // Last activity time
+}
+
+// ConvoyDetails contains detailed information about a convoy
+type ConvoyDetails struct {
+	ID            string
+	Title         string
+	Status        string
+	Completed     int
+	Total         int
+	TrackedIssues []TrackedIssue
+	CreatedAt     time.Time
+	ClosedAt      time.Time
+	LastActivity  time.Time
+}
+
+// TrackedIssue represents an issue tracked by a convoy
+type TrackedIssue struct {
+	ID        string
+	Title     string
+	Status    string
+	Assignee  string
+	Worker    string
+	WorkerAge string
+}
+
 // Model is the main bubbletea model for the feed TUI
 type Model struct {
 	// Dimensions
@@ -75,6 +114,14 @@ type Model struct {
 	showHelp bool
 	filter   string
 
+	// Selection and expansion state
+	treeCursor         int                // Cursor position in tree panel
+	convoyCursor       int                // Cursor position in convoy panel
+	expandedAgents     map[string]bool    // Tracks expanded agents by full ID
+	expandedConvoys    map[string]bool    // Tracks expanded convoys by ID
+	agentDetailsCache  map[string]*AgentDetails  // Cache of detailed agent info
+	convoyDetailsCache map[string]*ConvoyDetails // Cache of detailed convoy info
+
 	// Event source
 	eventChan <-chan Event
 	done      chan struct{}
@@ -87,15 +134,19 @@ func NewModel() *Model {
 	h.ShowAll = false
 
 	return &Model{
-		focusedPanel:   PanelTree,
-		treeViewport:   viewport.New(0, 0),
-		convoyViewport: viewport.New(0, 0),
-		feedViewport:   viewport.New(0, 0),
-		rigs:           make(map[string]*Rig),
-		events:         make([]Event, 0, 1000),
-		keys:           DefaultKeyMap(),
-		help:           h,
-		done:           make(chan struct{}),
+		focusedPanel:       PanelTree,
+		treeViewport:       viewport.New(0, 0),
+		convoyViewport:     viewport.New(0, 0),
+		feedViewport:       viewport.New(0, 0),
+		rigs:               make(map[string]*Rig),
+		events:             make([]Event, 0, 1000),
+		keys:               DefaultKeyMap(),
+		help:               h,
+		done:               make(chan struct{}),
+		expandedAgents:     make(map[string]bool),
+		expandedConvoys:    make(map[string]bool),
+		agentDetailsCache:  make(map[string]*AgentDetails),
+		convoyDetailsCache: make(map[string]*ConvoyDetails),
 	}
 }
 
@@ -257,9 +308,55 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Refresh):
 		m.updateViewContent()
 		return m, nil
+
+	case key.Matches(msg, m.keys.Enter), key.Matches(msg, m.keys.Expand):
+		// Toggle expansion on focused panel
+		switch m.focusedPanel {
+		case PanelTree:
+			m.toggleTreeExpansion()
+			m.updateViewContent()
+		case PanelConvoy:
+			m.toggleConvoyExpansion()
+			m.updateViewContent()
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		// Move cursor up in focused panel
+		switch m.focusedPanel {
+		case PanelTree:
+			if m.treeCursor > 0 {
+				m.treeCursor--
+				m.updateViewContent()
+			}
+		case PanelConvoy:
+			if m.convoyCursor > 0 {
+				m.convoyCursor--
+				m.updateViewContent()
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		// Move cursor down in focused panel
+		switch m.focusedPanel {
+		case PanelTree:
+			max := m.maxTreeCursor()
+			if m.treeCursor < max {
+				m.treeCursor++
+				m.updateViewContent()
+			}
+		case PanelConvoy:
+			max := m.maxConvoyCursor()
+			if m.convoyCursor < max {
+				m.convoyCursor++
+				m.updateViewContent()
+			}
+		}
+		return m, nil
 	}
 
-	// Pass to focused viewport
+	// Pass to focused viewport for scrolling
 	var cmd tea.Cmd
 	switch m.focusedPanel {
 	case PanelTree:
@@ -404,4 +501,165 @@ func (m *Model) SetEventChannel(ch <-chan Event) {
 // View renders the TUI
 func (m *Model) View() string {
 	return m.render()
+}
+
+// maxTreeCursor returns the maximum valid cursor position in the tree panel
+func (m *Model) maxTreeCursor() int {
+	count := 0
+	for _, rig := range m.rigs {
+		byRole := m.groupAgentsByRole(rig.Agents)
+		for _, role := range []string{"mayor", "witness", "refinery", "deacon", "crew", "polecat"} {
+			agents, ok := byRole[role]
+			if !ok || len(agents) == 0 {
+				continue
+			}
+			// Each agent is a selectable item
+			for _, agent := range agents {
+				count++ // agent row
+				if m.expandedAgents[agent.ID] {
+					count++ // expanded details take one more line conceptually
+				}
+			}
+		}
+	}
+	if count == 0 {
+		return 0
+	}
+	return count - 1
+}
+
+// maxConvoyCursor returns the maximum valid cursor position in the convoy panel
+func (m *Model) maxConvoyCursor() int {
+	if m.convoyState == nil {
+		return 0
+	}
+	count := 0
+	// Count in-progress convoys
+	for range m.convoyState.InProgress {
+		count++
+	}
+	// Count landed convoys
+	for range m.convoyState.Landed {
+		count++
+	}
+	if count == 0 {
+		return 0
+	}
+	return count - 1
+}
+
+// toggleTreeExpansion toggles expansion of the agent at the current cursor
+func (m *Model) toggleTreeExpansion() {
+	agent := m.getAgentAtCursor()
+	if agent != nil {
+		if m.expandedAgents[agent.ID] {
+			delete(m.expandedAgents, agent.ID)
+		} else {
+			m.expandedAgents[agent.ID] = true
+			// Fetch details if not cached
+			if _, ok := m.agentDetailsCache[agent.ID]; !ok {
+				details := m.fetchAgentDetails(agent)
+				m.agentDetailsCache[agent.ID] = details
+			}
+		}
+	}
+}
+
+// toggleConvoyExpansion toggles expansion of the convoy at the current cursor
+func (m *Model) toggleConvoyExpansion() {
+	convoy := m.getConvoyAtCursor()
+	if convoy != nil {
+		convoyID := convoy.ID
+		if m.expandedConvoys[convoyID] {
+			delete(m.expandedConvoys, convoyID)
+		} else {
+			m.expandedConvoys[convoyID] = true
+			// Fetch details if not cached
+			if _, ok := m.convoyDetailsCache[convoyID]; !ok {
+				details := m.fetchConvoyDetails(convoy)
+				m.convoyDetailsCache[convoyID] = details
+			}
+		}
+	}
+}
+
+// getAgentAtCursor returns the agent at the current tree cursor position
+func (m *Model) getAgentAtCursor() *Agent {
+	pos := 0
+	for _, rig := range m.rigs {
+		byRole := m.groupAgentsByRole(rig.Agents)
+		for _, role := range []string{"mayor", "witness", "refinery", "deacon", "crew", "polecat"} {
+			agents, ok := byRole[role]
+			if !ok || len(agents) == 0 {
+				continue
+			}
+			for _, agent := range agents {
+				if pos == m.treeCursor {
+					return agent
+				}
+				pos++
+				if m.expandedAgents[agent.ID] {
+					pos++ // skip expanded details
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// getConvoyAtCursor returns the convoy at the current convoy cursor position
+func (m *Model) getConvoyAtCursor() *Convoy {
+	if m.convoyState == nil {
+		return nil
+	}
+	pos := 0
+	// Check in-progress convoys
+	for i := range m.convoyState.InProgress {
+		if pos == m.convoyCursor {
+			return &m.convoyState.InProgress[i]
+		}
+		pos++
+	}
+	// Check landed convoys
+	for i := range m.convoyState.Landed {
+		if pos == m.convoyCursor {
+			return &m.convoyState.Landed[i]
+		}
+		pos++
+	}
+	return nil
+}
+
+// fetchAgentDetails fetches detailed information about an agent
+func (m *Model) fetchAgentDetails(agent *Agent) *AgentDetails {
+	// For now, return basic info from the Agent struct
+	// In a full implementation, this would query beads for full details
+	return &AgentDetails{
+		Name:       agent.Name,
+		Role:       agent.Role,
+		State:      agent.Status,
+		Running:    agent.Status == "running" || agent.Status == "working",
+		UpdatedAt:  agent.LastUpdate,
+		WorkTitle:  "", // Would fetch from bead
+		Branch:     "", // Would fetch from bead
+		HookBead:   "", // Would fetch from bead
+		UnreadMail: 0,  // Would fetch from bead
+	}
+}
+
+// fetchConvoyDetails fetches detailed information about a convoy
+func (m *Model) fetchConvoyDetails(convoy *Convoy) *ConvoyDetails {
+	// For now, return basic info from the Convoy struct
+	// In a full implementation, this would query beads for tracked issues
+	return &ConvoyDetails{
+		ID:            convoy.ID,
+		Title:         convoy.Title,
+		Status:        convoy.Status,
+		Completed:     convoy.Completed,
+		Total:         convoy.Total,
+		TrackedIssues: []TrackedIssue{}, // Would fetch from beads
+		CreatedAt:     convoy.CreatedAt,
+		ClosedAt:      convoy.ClosedAt,
+		LastActivity:  time.Now(), // Would calculate from events
+	}
 }

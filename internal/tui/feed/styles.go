@@ -100,6 +100,21 @@ var (
 				BorderForeground(colorPrimary).
 				Padding(0, 1)
 
+	// Selection and expansion styles
+	SelectedStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("236")).
+			Foreground(lipgloss.Color("15"))
+
+	DetailKeyStyle = lipgloss.NewStyle().
+			Foreground(colorAccent).
+			Bold(false)
+
+	DetailValueStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("15"))
+
+	DetailValueDimStyle = lipgloss.NewStyle().
+				Foreground(colorDim)
+
 	// Role icons - uses centralized emojis from constants package
 	RoleIcons = map[string]string{
 		constants.RoleMayor:    constants.EmojiMayor,
