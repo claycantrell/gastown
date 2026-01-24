@@ -60,6 +60,15 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating convoy handler: %w", err)
 	}
 
+	// Create WebSocket hub and start it
+	hub := web.NewHub(fetcher)
+	go hub.Run()
+
+	// Create HTTP router
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	mux.HandleFunc("/ws", hub.ServeWs)
+
 	// Build the URL
 	url := fmt.Sprintf("http://localhost:%d", dashboardPort)
 
@@ -70,11 +79,12 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 
 	// Start the server with timeouts
 	fmt.Printf("🚚 Gas Town Dashboard starting at %s\n", url)
+	fmt.Printf("   WebSocket endpoint: ws://localhost:%d/ws\n", dashboardPort)
 	fmt.Printf("   Press Ctrl+C to stop\n")
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", dashboardPort),
-		Handler:           handler,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

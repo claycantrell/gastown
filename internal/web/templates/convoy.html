@@ -320,6 +320,34 @@
             opacity: 0;
             transition: opacity 200ms ease-in;
         }
+
+        /* WebSocket connection indicator */
+        .ws-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 8px;
+        }
+
+        .ws-connected {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+        }
+
+        .ws-connecting {
+            background: var(--yellow);
+            animation: pulse 2s infinite;
+        }
+
+        .ws-disconnected {
+            background: var(--red);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
     </style>
 </head>
 <body>
@@ -327,8 +355,8 @@
         <header>
             <h1>🚚 Gas Town Convoys</h1>
             <span class="refresh-info">
-                Auto-refresh: every 10s
-                <span class="htmx-indicator">⟳</span>
+                Real-time updates
+                <span class="ws-indicator ws-connecting" id="wsIndicator"></span>
             </span>
         </header>
 
@@ -454,5 +482,66 @@
         </table>
         {{end}}
     </div>
+
+    <script>
+        // WebSocket connection for real-time updates
+        let ws;
+        let reconnectTimeout;
+        const wsIndicator = document.getElementById('wsIndicator');
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = protocol + '//' + window.location.host + '/ws';
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                wsIndicator.className = 'ws-indicator ws-connected';
+                if (reconnectTimeout) {
+                    clearTimeout(reconnectTimeout);
+                    reconnectTimeout = null;
+                }
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateDashboard(data);
+                } catch (e) {
+                    console.error('Error parsing WebSocket message:', e);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                wsIndicator.className = 'ws-indicator ws-disconnected';
+            };
+
+            ws.onclose = function() {
+                console.log('WebSocket disconnected, reconnecting...');
+                wsIndicator.className = 'ws-indicator ws-connecting';
+                reconnectTimeout = setTimeout(connect, 3000);
+            };
+        }
+
+        function updateDashboard(data) {
+            // Update the entire page content via htmx to maintain template rendering
+            // For now, trigger a full page refresh to get properly rendered HTML
+            htmx.ajax('GET', '/', {target: '.dashboard', swap: 'outerHTML'}).then(() => {
+                // Preserve WebSocket connection indicator after refresh
+                const newIndicator = document.getElementById('wsIndicator');
+                if (newIndicator && wsIndicator) {
+                    newIndicator.className = wsIndicator.className;
+                }
+            });
+        }
+
+        // Connect on page load
+        connect();
+
+        // Fallback: htmx polling every 30s in case WebSocket fails
+        // This provides redundancy
+    </script>
 </body>
 </html>
