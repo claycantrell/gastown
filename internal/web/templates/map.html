@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gas Town - 2D Map</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            font-size: 24px;
+            color: #4CAF50;
+        }
+        .nav-links a {
+            color: #4CAF50;
+            text-decoration: none;
+            margin-left: 20px;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            max-width: 1600px;
+        }
+        .map-container {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 20px;
+        }
+        .detail-panel {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        svg {
+            width: 100%;
+            height: 600px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+        }
+
+        /* Building styles */
+        .building {
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .building:hover {
+            opacity: 0.8;
+        }
+        .building circle {
+            stroke-width: 0.3;
+        }
+        .building-open circle {
+            fill: #4CAF50;
+            stroke: #66BB6A;
+        }
+        .building-closed circle {
+            fill: #757575;
+            stroke: #9E9E9E;
+        }
+        .building text {
+            fill: #e0e0e0;
+            font-size: 2px;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        /* Polecat styles */
+        .polecat {
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .polecat:hover {
+            opacity: 0.8;
+        }
+        .polecat rect {
+            stroke-width: 0.3;
+            stroke: #333;
+        }
+        .polecat-green rect {
+            fill: #4CAF50;
+        }
+        .polecat-yellow rect {
+            fill: #FFC107;
+        }
+        .polecat-red rect {
+            fill: #F44336;
+        }
+        .polecat-unknown rect {
+            fill: #757575;
+        }
+        .polecat text {
+            fill: #e0e0e0;
+            font-size: 2px;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        /* Legend */
+        .legend {
+            margin-top: 15px;
+            padding: 10px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        .legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+            vertical-align: middle;
+            border-radius: 50%;
+        }
+        .color-open { background: #4CAF50; }
+        .color-closed { background: #757575; }
+        .color-active { background: #4CAF50; }
+        .color-stale { background: #FFC107; }
+        .color-stuck { background: #F44336; }
+
+        /* Detail panel styles */
+        .detail-empty {
+            color: #888;
+            font-style: italic;
+            text-align: center;
+            padding: 40px;
+        }
+        .detail-title {
+            font-size: 18px;
+            color: #4CAF50;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+        .detail-section {
+            margin-bottom: 15px;
+        }
+        .detail-label {
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .detail-value {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .status-open { background: #4CAF50; color: #000; }
+        .status-closed { background: #757575; color: #fff; }
+        .work-active { background: #4CAF50; color: #000; }
+        .work-complete { background: #2196F3; color: #fff; }
+        .work-stale { background: #FFC107; color: #000; }
+        .work-stuck { background: #F44336; color: #fff; }
+        .work-waiting { background: #9E9E9E; color: #fff; }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body hx-ext="debug">
+    <div class="header">
+        <h1>🗺️ Gas Town - 2D Map</h1>
+        <div class="nav-links">
+            <a href="/">📊 Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="map-container">
+            <svg id="map-canvas" viewBox="0 0 100 100">
+                <!-- Buildings -->
+                {{range .Buildings}}
+                <g class="building building-{{.Status}}"
+                   hx-get="/map/building/{{.ID}}"
+                   hx-target="#detail-panel"
+                   hx-trigger="click">
+                    <circle cx="{{.X}}" cy="{{.Y}}" r="2.5" />
+                    <text x="{{.X}}" y="{{printf "%.1f" (add .Y -3.5)}}">{{.Title}}</text>
+                </g>
+                {{end}}
+
+                <!-- Polecats -->
+                {{range .Polecats}}
+                <g class="polecat polecat-{{.Status}}"
+                   hx-get="/map/polecat/{{.SessionID}}"
+                   hx-target="#detail-panel"
+                   hx-trigger="click">
+                    <rect x="{{printf "%.1f" (sub .X 1)}}" y="{{printf "%.1f" (sub .Y 1)}}" width="2" height="2" rx="0.2" />
+                    <text x="{{.X}}" y="{{printf "%.1f" (add .Y -2)}}">{{.Name}}</text>
+                </g>
+                {{end}}
+
+                <!-- Section labels -->
+                <text x="25" y="8" fill="#888" font-size="3" text-anchor="middle">OPEN CONVOYS</text>
+                <text x="75" y="8" fill="#888" font-size="3" text-anchor="middle">CLOSED CONVOYS</text>
+                <text x="50" y="92" fill="#888" font-size="3" text-anchor="middle">POLECATS</text>
+            </svg>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <span class="legend-color color-open"></span>Open
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color color-closed"></span>Closed
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color color-active"></span>Active
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color color-stale"></span>Stale
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color color-stuck"></span>Stuck
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-panel" id="detail-panel">
+            <div class="detail-empty">
+                Click on a building or polecat to view details
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh map every 10 seconds
+        setInterval(() => {
+            window.location.reload();
+        }, 10000);
+    </script>
+</body>
+</html>

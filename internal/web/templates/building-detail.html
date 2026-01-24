@@ -1,0 +1,44 @@
+<div class="detail-title">🏢 {{.Title}}</div>
+
+<div class="detail-section">
+    <div class="detail-label">Convoy ID</div>
+    <div class="detail-value"><code>{{.ID}}</code></div>
+</div>
+
+<div class="detail-section">
+    <div class="detail-label">Status</div>
+    <div class="detail-value">
+        <span class="status-badge status-{{.Status}}">{{.Status}}</span>
+        <span class="status-badge work-{{.WorkStatus}}">{{.WorkStatus}}</span>
+    </div>
+</div>
+
+<div class="detail-section">
+    <div class="detail-label">Progress</div>
+    <div class="detail-value">{{.Progress}} ({{.Completed}}/{{.Total}} tasks)</div>
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: {{progressPercent .Completed .Total}}%"></div>
+    </div>
+</div>
+
+<div class="detail-section">
+    <div class="detail-label">Last Activity</div>
+    <div class="detail-value {{activityClass .LastActivity}}">
+        {{.LastActivity.Message}}
+    </div>
+</div>
+
+{{if .TrackedIssues}}
+<div class="detail-section">
+    <div class="detail-label">Tracked Issues</div>
+    <div class="detail-value">
+        {{range .TrackedIssues}}
+        <div style="margin: 5px 0; padding: 5px; background: #1e1e1e; border-left: 2px solid #4CAF50;">
+            <div style="font-size: 12px; font-weight: bold;">{{.ID}}</div>
+            <div style="font-size: 11px; color: #888;">{{.Title}}</div>
+            <div style="font-size: 10px; color: #666;">Status: {{.Status}}{{if .Assignee}} | Assignee: {{.Assignee}}{{end}}</div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}

@@ -1,0 +1,27 @@
+<div class="detail-title">🦝 {{.Name}}</div>
+
+<div class="detail-section">
+    <div class="detail-label">Session ID</div>
+    <div class="detail-value"><code>{{.SessionID}}</code></div>
+</div>
+
+<div class="detail-section">
+    <div class="detail-label">Rig</div>
+    <div class="detail-value">{{.Rig}}</div>
+</div>
+
+<div class="detail-section">
+    <div class="detail-label">Last Activity</div>
+    <div class="detail-value {{activityClass .LastActivity}}">
+        {{.LastActivity.Message}}
+    </div>
+</div>
+
+{{if .StatusHint}}
+<div class="detail-section">
+    <div class="detail-label">Status</div>
+    <div class="detail-value" style="font-size: 11px; color: #888;">
+        {{.StatusHint}}
+    </div>
+</div>
+{{end}}

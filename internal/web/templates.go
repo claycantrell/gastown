@@ -3,6 +3,7 @@ package web
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"io/fs"
 
@@ -68,6 +69,9 @@ func LoadTemplates() (*template.Template, error) {
 		"statusClass":     statusClass,
 		"workStatusClass": workStatusClass,
 		"progressPercent": progressPercent,
+		"add":             add,
+		"sub":             sub,
+		"printf":          printf,
 	}
 
 	// Get the templates subdirectory
@@ -135,4 +139,19 @@ func progressPercent(completed, total int) int {
 		return 0
 	}
 	return (completed * 100) / total
+}
+
+// add adds two float64 numbers (for template arithmetic).
+func add(a, b float64) float64 {
+	return a + b
+}
+
+// sub subtracts two float64 numbers (for template arithmetic).
+func sub(a, b float64) float64 {
+	return a - b
+}
+
+// printf formats a float64 with the given format string.
+func printf(format string, a float64) string {
+	return fmt.Sprintf(format, a)
 }

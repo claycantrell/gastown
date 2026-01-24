@@ -800,3 +800,37 @@ func parseActivityTimestamp(s string) (int64, bool) {
 	}
 	return unix, true
 }
+
+// FetchConvoyByID fetches a single convoy by ID.
+func (f *LiveConvoyFetcher) FetchConvoyByID(id string) (*ConvoyRow, error) {
+	// Fetch all convoys and find the matching one
+	convoys, err := f.FetchConvoys()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, convoy := range convoys {
+		if convoy.ID == id {
+			return &convoy, nil
+		}
+	}
+
+	return nil, fmt.Errorf("convoy not found: %s", id)
+}
+
+// FetchPolecatBySessionID fetches a single polecat by session ID.
+func (f *LiveConvoyFetcher) FetchPolecatBySessionID(sessionID string) (*PolecatRow, error) {
+	// Fetch all polecats and find the matching one
+	polecats, err := f.FetchPolecats()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, polecat := range polecats {
+		if polecat.SessionID == sessionID {
+			return &polecat, nil
+		}
+	}
+
+	return nil, fmt.Errorf("polecat not found: %s", sessionID)
+}

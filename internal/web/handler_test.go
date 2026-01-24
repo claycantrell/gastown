@@ -35,6 +35,24 @@ func (m *MockConvoyFetcher) FetchPolecats() ([]PolecatRow, error) {
 	return m.Polecats, nil
 }
 
+func (m *MockConvoyFetcher) FetchConvoyByID(id string) (*ConvoyRow, error) {
+	for _, convoy := range m.Convoys {
+		if convoy.ID == id {
+			return &convoy, nil
+		}
+	}
+	return nil, errors.New("convoy not found")
+}
+
+func (m *MockConvoyFetcher) FetchPolecatBySessionID(sessionID string) (*PolecatRow, error) {
+	for _, polecat := range m.Polecats {
+		if polecat.SessionID == sessionID {
+			return &polecat, nil
+		}
+	}
+	return nil, errors.New("polecat not found")
+}
+
 func TestConvoyHandler_RendersTemplate(t *testing.T) {
 	mock := &MockConvoyFetcher{
 		Convoys: []ConvoyRow{
@@ -962,6 +980,19 @@ func (m *MockConvoyFetcherWithErrors) FetchMergeQueue() ([]MergeQueueRow, error)
 
 func (m *MockConvoyFetcherWithErrors) FetchPolecats() ([]PolecatRow, error) {
 	return nil, m.PolecatsError
+}
+
+func (m *MockConvoyFetcherWithErrors) FetchConvoyByID(id string) (*ConvoyRow, error) {
+	for _, convoy := range m.Convoys {
+		if convoy.ID == id {
+			return &convoy, nil
+		}
+	}
+	return nil, errors.New("convoy not found")
+}
+
+func (m *MockConvoyFetcherWithErrors) FetchPolecatBySessionID(sessionID string) (*PolecatRow, error) {
+	return nil, errors.New("polecat not found")
 }
 
 func TestConvoyHandler_NonFatalErrors(t *testing.T) {

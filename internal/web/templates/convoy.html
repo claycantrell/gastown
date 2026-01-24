@@ -326,10 +326,13 @@
     <div class="dashboard" hx-get="/" hx-trigger="every 10s" hx-swap="outerHTML">
         <header>
             <h1>🚚 Gas Town Convoys</h1>
-            <span class="refresh-info">
-                Auto-refresh: every 10s
-                <span class="htmx-indicator">⟳</span>
-            </span>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <a href="/map" style="color: var(--green); text-decoration: none;">🗺️ Map View</a>
+                <span class="refresh-info">
+                    Auto-refresh: every 10s
+                    <span class="htmx-indicator">⟳</span>
+                </span>
+            </div>
         </header>
 
         {{if .Convoys}}
