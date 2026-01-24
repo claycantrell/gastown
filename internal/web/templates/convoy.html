@@ -620,10 +620,7 @@
         });
 
         // Animation loop
-        let elapsed = 0;
         app.ticker.add((delta) => {
-            elapsed += delta;
-
             warRigs.forEach(rig => {
                 // Update movement progress
                 rig.progress += rig.speed * delta;
