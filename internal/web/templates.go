@@ -26,6 +26,16 @@ type PolecatRow struct {
 	SessionID    string        // e.g., "gt-roxas-dag"
 	LastActivity activity.Info // Colored activity display
 	StatusHint   string        // Last line from pane (optional)
+	ConvoyInfo   *ConvoyInfo   // Convoy this polecat is working on (nil if none)
+}
+
+// ConvoyInfo represents convoy assignment data for a polecat.
+type ConvoyInfo struct {
+	ID          string // e.g., "hq-cv-abc"
+	Title       string // e.g., "Add data overlays"
+	WorkStatus  string // "active", "complete", "stale", "stuck", "waiting"
+	Progress    string // e.g., "2/5"
+	ColorClass  string // CSS class for status badge
 }
 
 // MergeQueueRow represents a PR in the merge queue.

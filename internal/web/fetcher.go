@@ -702,13 +702,20 @@ func (f *LiveConvoyFetcher) FetchPolecats() ([]PolecatRow, error) {
 			statusHint = f.getPolecatStatusHint(sessionName)
 		}
 
-		polecats = append(polecats, PolecatRow{
+		row := PolecatRow{
 			Name:         polecat,
 			Rig:          rig,
 			SessionID:    sessionName,
 			LastActivity: activity.Calculate(activityTime),
 			StatusHint:   statusHint,
-		})
+		}
+
+		// Fetch convoy assignment for workers (skip refinery, witness, etc.)
+		if polecat != "refinery" && isWorkerSession(polecat) {
+			row.ConvoyInfo = f.getConvoyForPolecat(rig, polecat)
+		}
+
+		polecats = append(polecats, row)
 	}
 
 	return polecats, nil
@@ -799,4 +806,167 @@ func parseActivityTimestamp(s string) (int64, bool) {
 		return 0, false
 	}
 	return unix, true
+}
+
+// getConvoyForPolecat finds the convoy a polecat is currently working on.
+// Returns nil if no convoy assigned.
+func (f *LiveConvoyFetcher) getConvoyForPolecat(rig, polecat string) *ConvoyInfo {
+	// Construct assignee path: rigname/polecats/polecatname
+	assignee := fmt.Sprintf("%s/polecats/%s", rig, polecat)
+
+	// Find the open issue assigned to this polecat
+	issue := f.getAssignedIssue(assignee)
+	if issue == nil {
+		return nil
+	}
+
+	// Find the convoy tracking this issue
+	convoyID := f.getTrackingConvoy(issue.ID)
+	if convoyID == "" {
+		return nil
+	}
+
+	// Fetch convoy details
+	convoy := f.getConvoyDetails(convoyID)
+	return convoy
+}
+
+// getAssignedIssue queries beads for the first open issue assigned to this polecat.
+// Returns nil if no assigned issue found.
+func (f *LiveConvoyFetcher) getAssignedIssue(assignee string) *issueDetail {
+	dbPath := filepath.Join(f.townBeads, "beads.db")
+
+	// Query for open issues assigned to this polecat
+	safeAssignee := strings.ReplaceAll(assignee, "'", "''")
+	// #nosec G204 -- sqlite3 path is from trusted config, assignee is escaped
+	queryCmd := exec.Command("sqlite3", "-json", dbPath,
+		fmt.Sprintf(`SELECT id, title, status FROM issues WHERE assignee = '%s' AND status IN ('open', 'in_progress') LIMIT 1`, safeAssignee))
+
+	var stdout bytes.Buffer
+	queryCmd.Stdout = &stdout
+	if err := queryCmd.Run(); err != nil {
+		return nil
+	}
+
+	var issues []struct {
+		ID     string `json:"id"`
+		Title  string `json:"title"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &issues); err != nil || len(issues) == 0 {
+		return nil
+	}
+
+	return &issueDetail{
+		ID:     issues[0].ID,
+		Title:  issues[0].Title,
+		Status: issues[0].Status,
+	}
+}
+
+// getTrackingConvoy finds the convoy tracking a given issue.
+// Returns empty string if no convoy found.
+func (f *LiveConvoyFetcher) getTrackingConvoy(issueID string) string {
+	dbPath := filepath.Join(f.townBeads, "beads.db")
+
+	// Query dependencies for convoy tracking this issue
+	// Convoys have type="tracks" dependencies on issues
+	safeIssueID := strings.ReplaceAll(issueID, "'", "''")
+	// #nosec G204 -- sqlite3 path is from trusted config, issueID is escaped
+	queryCmd := exec.Command("sqlite3", "-json", dbPath,
+		fmt.Sprintf(`SELECT issue_id FROM dependencies WHERE depends_on_id = '%s' AND type = 'tracks'`, safeIssueID))
+
+	var stdout bytes.Buffer
+	queryCmd.Stdout = &stdout
+	if err := queryCmd.Run(); err != nil {
+		return ""
+	}
+
+	var deps []struct {
+		IssueID string `json:"issue_id"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &deps); err != nil || len(deps) == 0 {
+		return ""
+	}
+
+	// Return first convoy (polecats typically work on one issue at a time)
+	return deps[0].IssueID
+}
+
+// getConvoyDetails fetches convoy details and computes display info.
+// Returns nil if convoy not found or fetch fails.
+func (f *LiveConvoyFetcher) getConvoyDetails(convoyID string) *ConvoyInfo {
+	// Fetch convoy via bd show
+	// #nosec G204 -- bd is a trusted internal tool, convoyID is from database
+	cmd := exec.Command("bd", "show", convoyID, "--json")
+	cmd.Dir = f.townBeads
+
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		return nil
+	}
+
+	var convoys []struct {
+		ID     string `json:"id"`
+		Title  string `json:"title"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &convoys); err != nil || len(convoys) == 0 {
+		return nil
+	}
+
+	convoy := convoys[0]
+
+	// Get tracked issues for progress calculation
+	tracked := f.getTrackedIssues(convoy.ID)
+	completed := 0
+	for _, t := range tracked {
+		if t.Status == "closed" {
+			completed++
+		}
+	}
+
+	total := len(tracked)
+	progress := fmt.Sprintf("%d/%d", completed, total)
+
+	// Calculate work status (reuse existing logic)
+	workStatus := "waiting"
+	if total > 0 && completed == total {
+		workStatus = "complete"
+	} else if total > 0 {
+		// Simplified: just use "active" for in-progress convoys
+		// Full logic would check activity timestamps
+		workStatus = "active"
+	}
+
+	// Truncate title to 30 chars for display
+	title := convoy.Title
+	if len(title) > 30 {
+		title = title[:27] + "..."
+	}
+
+	return &ConvoyInfo{
+		ID:         convoy.ID,
+		Title:      title,
+		WorkStatus: workStatus,
+		Progress:   progress,
+		ColorClass: workStatusToColorClass(workStatus),
+	}
+}
+
+// workStatusToColorClass converts work status to CSS class name.
+func workStatusToColorClass(status string) string {
+	switch status {
+	case "complete":
+		return "work-complete"
+	case "active":
+		return "work-active"
+	case "stale":
+		return "work-stale"
+	case "stuck":
+		return "work-stuck"
+	default:
+		return "work-waiting"
+	}
 }

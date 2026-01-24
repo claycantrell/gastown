@@ -177,6 +177,10 @@
             margin-left: 8px;
         }
 
+        .text-secondary {
+            color: var(--text-secondary);
+        }
+
         .progress {
             font-variant-numeric: tabular-nums;
         }
@@ -433,6 +437,7 @@
                     <th>Polecat</th>
                     <th>Rig</th>
                     <th>Last Activity</th>
+                    <th>Convoy</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -446,6 +451,15 @@
                     <td class="{{activityClass .LastActivity}}">
                         <span class="activity-dot"></span>
                         {{.LastActivity.FormattedAge}}
+                    </td>
+                    <td>
+                        {{if .ConvoyInfo}}
+                        <span class="work-status {{.ConvoyInfo.ColorClass}}">{{.ConvoyInfo.WorkStatus}}</span>
+                        <span class="convoy-id">{{.ConvoyInfo.ID}}</span>
+                        <span class="text-secondary">{{.ConvoyInfo.Progress}}</span>
+                        {{else}}
+                        <span class="text-secondary">—</span>
+                        {{end}}
                     </td>
                     <td class="status-hint">{{.StatusHint}}</td>
                 </tr>
