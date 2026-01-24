@@ -11,6 +11,7 @@ import (
 
 	"github.com/steveyegge/gastown/internal/activity"
 	"github.com/steveyegge/gastown/internal/config"
+	"github.com/steveyegge/gastown/internal/polecat"
 	"github.com/steveyegge/gastown/internal/workspace"
 )
 
@@ -648,7 +649,16 @@ func (f *LiveConvoyFetcher) FetchPolecats() ([]PolecatRow, error) {
 	// Pre-fetch merge queue count to determine refinery idle status
 	mergeQueueCount := f.getMergeQueueCount()
 
-	var polecats []PolecatRow
+	// First pass: collect all polecats and unique rigs
+	type polecatInfo struct {
+		name         string
+		rig          string
+		sessionID    string
+		activityTime time.Time
+		statusHint   string
+	}
+	var polecatData []polecatInfo
+	rigsSet := make(map[string]bool)
 	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
 
 	for _, line := range lines {
@@ -674,7 +684,7 @@ func (f *LiveConvoyFetcher) FetchPolecats() ([]PolecatRow, error) {
 			continue
 		}
 		rig := nameParts[1]
-		polecat := nameParts[2]
+		polecatName := nameParts[2]
 
 		// Skip rigs not registered in this workspace
 		if !registeredRigs[rig] {
@@ -683,7 +693,7 @@ func (f *LiveConvoyFetcher) FetchPolecats() ([]PolecatRow, error) {
 
 		// Skip non-worker sessions (witness, mayor, deacon, boot)
 		// Note: refinery is included to show idle/processing status
-		if polecat == "witness" || polecat == "mayor" || polecat == "deacon" || polecat == "boot" {
+		if polecatName == "witness" || polecatName == "mayor" || polecatName == "deacon" || polecatName == "boot" {
 			continue
 		}
 
@@ -696,18 +706,51 @@ func (f *LiveConvoyFetcher) FetchPolecats() ([]PolecatRow, error) {
 
 		// Get status hint - special handling for refinery
 		var statusHint string
-		if polecat == "refinery" {
+		if polecatName == "refinery" {
 			statusHint = f.getRefineryStatusHint(mergeQueueCount)
 		} else {
 			statusHint = f.getPolecatStatusHint(sessionName)
 		}
 
+		polecatData = append(polecatData, polecatInfo{
+			name:         polecatName,
+			rig:          rig,
+			sessionID:    sessionName,
+			activityTime: activityTime,
+			statusHint:   statusHint,
+		})
+		rigsSet[rig] = true
+	}
+
+	// Build rig index for position calculation
+	rigs := make([]string, 0, len(rigsSet))
+	for rig := range rigsSet {
+		rigs = append(rigs, rig)
+	}
+	rigIndex := polecat.BuildRigIndex(rigs)
+
+	// Second pass: build PolecatRow with positions
+	polecats := make([]PolecatRow, 0, len(polecatData))
+	for _, info := range polecatData {
+		// Determine state based on activity color (approximation)
+		activityInfo := activity.Calculate(info.activityTime)
+		state := f.inferStateFromActivity(activityInfo)
+
+		// Calculate position
+		idx := rigIndex[info.rig]
+		position := polecat.CalculatePosition(info.name, state, idx)
+
 		polecats = append(polecats, PolecatRow{
-			Name:         polecat,
-			Rig:          rig,
-			SessionID:    sessionName,
-			LastActivity: activity.Calculate(activityTime),
-			StatusHint:   statusHint,
+			Name:         info.name,
+			Rig:          info.rig,
+			SessionID:    info.sessionID,
+			LastActivity: activityInfo,
+			StatusHint:   info.statusHint,
+			State:        string(state),
+			Position: Position{
+				X: position.X,
+				Y: position.Y,
+			},
 		})
 	}
 
@@ -799,4 +842,20 @@ func parseActivityTimestamp(s string) (int64, bool) {
 		return 0, false
 	}
 	return unix, true
+}
+
+// inferStateFromActivity infers polecat state from activity info.
+// This is an approximation based on activity freshness:
+//   - Green (<2m):  Working
+//   - Yellow (2-5m): Working
+//   - Red (>5m):     Stuck
+func (f *LiveConvoyFetcher) inferStateFromActivity(info activity.Info) polecat.State {
+	switch info.ColorClass {
+	case activity.ColorGreen, activity.ColorYellow:
+		return polecat.StateWorking
+	case activity.ColorRed:
+		return polecat.StateStuck
+	default:
+		return polecat.StateWorking
+	}
 }

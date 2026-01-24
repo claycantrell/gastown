@@ -3,6 +3,7 @@ package web
 
 import (
 	"embed"
+	"encoding/json"
 	"html/template"
 	"io/fs"
 
@@ -19,6 +20,11 @@ type ConvoyData struct {
 	Polecats   []PolecatRow
 }
 
+// MapData represents data passed to the map template.
+type MapData struct {
+	Polecats []PolecatRow
+}
+
 // PolecatRow represents a polecat worker in the dashboard.
 type PolecatRow struct {
 	Name         string        // e.g., "dag", "nux"
@@ -26,6 +32,14 @@ type PolecatRow struct {
 	SessionID    string        // e.g., "gt-roxas-dag"
 	LastActivity activity.Info // Colored activity display
 	StatusHint   string        // Last line from pane (optional)
+	State        string        // Current state: "working", "done", "stuck"
+	Position     Position      // 2D map coordinates
+}
+
+// Position represents a 2D coordinate on the desert map.
+type Position struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
 }
 
 // MergeQueueRow represents a PR in the merge queue.
@@ -68,6 +82,7 @@ func LoadTemplates() (*template.Template, error) {
 		"statusClass":     statusClass,
 		"workStatusClass": workStatusClass,
 		"progressPercent": progressPercent,
+		"json":            toJSON,
 	}
 
 	// Get the templates subdirectory
@@ -135,4 +150,13 @@ func progressPercent(completed, total int) int {
 		return 0
 	}
 	return (completed * 100) / total
+}
+
+// toJSON converts a value to JSON for embedding in templates.
+func toJSON(v interface{}) template.JS {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return template.JS("{}")
+	}
+	return template.JS(b)
 }

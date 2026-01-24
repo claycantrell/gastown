@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desert Map - Gas Town</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        :root {
+            --bg-dark: #1a1a2e;
+            --bg-card: #16213e;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --border: #0f3460;
+            --green: #4ade80;
+            --yellow: #facc15;
+            --red: #f87171;
+            --desert-sand: #e6d5ac;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            background: var(--bg-card);
+            transition: background 0.2s;
+        }
+
+        .nav-link:hover {
+            background: var(--border);
+        }
+
+        .refresh-info {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .map-container {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 600px;
+            background: linear-gradient(to bottom, #2c3e50 0%, #34495e 100%);
+            border-radius: 4px;
+            cursor: default;
+        }
+
+        .legend {
+            margin-top: 20px;
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+            padding: 16px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.green {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+        }
+
+        .legend-dot.yellow {
+            background: var(--yellow);
+            box-shadow: 0 0 8px var(--yellow);
+        }
+
+        .legend-dot.red {
+            background: var(--red);
+            box-shadow: 0 0 8px var(--red);
+        }
+
+        .zone-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .zone-line {
+            width: 20px;
+            height: 2px;
+            border-top: 2px dashed var(--text-secondary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state h2 {
+            font-size: 1.25rem;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌵 Desert Map - Live Polecat Tracking</h1>
+            <div class="nav-links">
+                <a href="/" class="nav-link">← Dashboard</a>
+                <span class="refresh-info">
+                    Auto-refresh: every 10s
+                </span>
+            </div>
+        </header>
+
+        {{if .Polecats}}
+        <div class="map-container" id="map-container"
+             hx-get="/api/polecat-positions"
+             hx-trigger="every 10s"
+             hx-swap="none">
+            <canvas id="desert-map"></canvas>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <strong>Activity:</strong>
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot green"></span>
+                <span>Active (&lt;2m)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot yellow"></span>
+                <span>Stale (2-5m)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot red"></span>
+                <span>Stuck (&gt;5m)</span>
+            </div>
+            <div class="legend-item">
+                <div class="zone-label">
+                    <span class="zone-line"></span>
+                    <span>Zone Boundaries</span>
+                </div>
+            </div>
+        </div>
+        {{else}}
+        <div class="empty-state">
+            <h2>No active polecats</h2>
+            <p>Spawn a polecat to see them on the desert map</p>
+        </div>
+        {{end}}
+    </div>
+
+    <script>
+        // Initial polecat data from server
+        let polecats = {{ . | json }};
+
+        const canvas = document.getElementById('desert-map');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas resolution
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width - 40; // Account for padding
+            canvas.height = 600;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Activity color mapping
+        function getActivityColor(activityClass) {
+            if (activityClass === 'activity-green') return '#4ade80';
+            if (activityClass === 'activity-yellow') return '#facc15';
+            if (activityClass === 'activity-red') return '#f87171';
+            return '#aaa';
+        }
+
+        // Draw the desert map
+        function drawMap() {
+            if (!polecats || !polecats.Polecats || polecats.Polecats.length === 0) {
+                return;
+            }
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padding = 50;
+            const mapWidth = canvas.width - 2 * padding;
+            const mapHeight = canvas.height - 2 * padding;
+
+            // Draw zone boundaries
+            ctx.strokeStyle = '#aaa';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+
+            // Working zone boundary (y=300)
+            const workingY = padding + (300 / 600) * mapHeight;
+            ctx.beginPath();
+            ctx.moveTo(padding, workingY);
+            ctx.lineTo(canvas.width - padding, workingY);
+            ctx.stroke();
+
+            // Done zone boundary (y=500)
+            const doneY = padding + (500 / 600) * mapHeight;
+            ctx.beginPath();
+            ctx.moveTo(padding, doneY);
+            ctx.lineTo(canvas.width - padding, doneY);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            // Draw zone labels
+            ctx.fillStyle = '#aaa';
+            ctx.font = '12px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText('Ready/Idle', padding - 10, padding + 20);
+            ctx.fillText('Working', padding - 10, workingY + 20);
+            ctx.fillText('Done', padding - 10, doneY + 20);
+
+            // Collect unique rigs and find X range for scaling
+            const rigs = new Set();
+            const rigPositions = {};
+            let minX = Infinity;
+            let maxX = -Infinity;
+
+            polecats.Polecats.forEach(p => {
+                rigs.add(p.Rig);
+                minX = Math.min(minX, p.Position.X);
+                maxX = Math.max(maxX, p.Position.X);
+            });
+
+            // Calculate scale factor (with some margin)
+            const posMargin = 50; // Extra margin on each side
+            const posRangeX = Math.max(maxX - minX, 200); // Min range for single rig
+            const scaleX = mapWidth / (posRangeX + 2 * posMargin);
+            const offsetX = minX - posMargin;
+
+            // Calculate rig positions
+            polecats.Polecats.forEach(p => {
+                if (!rigPositions[p.Rig]) {
+                    const x = padding + (p.Position.X - offsetX) * scaleX;
+                    rigPositions[p.Rig] = x;
+                }
+            });
+
+            // Draw rig markers
+            ctx.fillStyle = '#e6d5ac';
+            ctx.font = '16px monospace';
+            ctx.textAlign = 'center';
+            Object.entries(rigPositions).forEach(([rig, x]) => {
+                ctx.fillText(`🌵 ${rig}`, x, padding - 20);
+            });
+
+            // Draw polecats
+            polecats.Polecats.forEach(p => {
+                const x = padding + (p.Position.X - offsetX) * scaleX;
+                const y = padding + (p.Position.Y / 600) * mapHeight;
+
+                // Get activity color
+                const activityClass = p.LastActivity ?
+                    `activity-${p.LastActivity.ColorClass || 'unknown'}` :
+                    'activity-unknown';
+                const color = getActivityColor(activityClass);
+
+                // Draw polecat circle
+                ctx.fillStyle = color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = color;
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Draw polecat name
+                ctx.fillStyle = '#eee';
+                ctx.font = '11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(p.Name, x, y - 12);
+
+                // Draw activity age
+                if (p.LastActivity && p.LastActivity.FormattedAge) {
+                    ctx.fillStyle = '#aaa';
+                    ctx.font = '9px monospace';
+                    ctx.fillText(p.LastActivity.FormattedAge, x, y + 20);
+                }
+            });
+        }
+
+        // Initial draw
+        drawMap();
+
+        // Listen for htmx updates
+        document.getElementById('map-container').addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.successful) {
+                try {
+                    polecats = JSON.parse(event.detail.xhr.responseText);
+                    drawMap();
+                } catch (e) {
+                    console.error('Failed to parse polecat positions:', e);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
