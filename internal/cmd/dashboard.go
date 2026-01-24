@@ -54,11 +54,22 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating convoy fetcher: %w", err)
 	}
 
-	// Create the handler
-	handler, err := web.NewConvoyHandler(fetcher)
+	// Create the convoy handler
+	convoyHandler, err := web.NewConvoyHandler(fetcher)
 	if err != nil {
 		return fmt.Errorf("creating convoy handler: %w", err)
 	}
+
+	// Create the map handler
+	mapHandler, err := web.NewMapHandler()
+	if err != nil {
+		return fmt.Errorf("creating map handler: %w", err)
+	}
+
+	// Create a multiplexer with both routes
+	mux := http.NewServeMux()
+	mux.Handle("/", convoyHandler)
+	mux.Handle("/map", mapHandler)
 
 	// Build the URL
 	url := fmt.Sprintf("http://localhost:%d", dashboardPort)
@@ -70,11 +81,14 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 
 	// Start the server with timeouts
 	fmt.Printf("🚚 Gas Town Dashboard starting at %s\n", url)
+	fmt.Printf("   Routes:\n")
+	fmt.Printf("   - %s/ (convoy dashboard)\n", url)
+	fmt.Printf("   - %s/map (desert map)\n", url)
 	fmt.Printf("   Press Ctrl+C to stop\n")
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", dashboardPort),
-		Handler:           handler,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

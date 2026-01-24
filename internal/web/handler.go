@@ -64,3 +64,30 @@ func (h *ConvoyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+// MapHandler handles HTTP requests for the desert map visualization.
+type MapHandler struct {
+	template *template.Template
+}
+
+// NewMapHandler creates a new map handler.
+func NewMapHandler() (*MapHandler, error) {
+	tmpl, err := LoadTemplates()
+	if err != nil {
+		return nil, err
+	}
+
+	return &MapHandler{
+		template: tmpl,
+	}, nil
+}
+
+// ServeHTTP handles GET /map requests and renders the desert map.
+func (h *MapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	if err := h.template.ExecuteTemplate(w, "map.html", nil); err != nil {
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+		return
+	}
+}
