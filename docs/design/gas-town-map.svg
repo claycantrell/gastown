@@ -1,0 +1,265 @@
+<svg width="1200" height="900" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+  <defs>
+    <!-- Isometric building styles -->
+    <style>
+      .building { fill: #e1f5ff; stroke: #0066cc; stroke-width: 2; }
+      .mayor-building { fill: #ffd700; stroke: #cc9900; stroke-width: 3; }
+      .deacon-building { fill: #ff6b6b; stroke: #cc0000; stroke-width: 2; }
+      .refinery { fill: #a8e6cf; stroke: #2d6a4f; stroke-width: 2; }
+      .witness { fill: #ffb7b2; stroke: #d45a4f; stroke-width: 2; }
+      .polecat { fill: #ffd3b6; stroke: #ff8c42; stroke-width: 1.5; }
+      .crew { fill: #dda15e; stroke: #bc6c25; stroke-width: 1.5; }
+      .path { fill: none; stroke: #666; stroke-width: 2; stroke-dasharray: 5,5; }
+      .convoy-route { fill: none; stroke: #4a90e2; stroke-width: 3; }
+      .mail-flow { fill: none; stroke: #50c878; stroke-width: 2; stroke-dasharray: 8,4; }
+      .label { font-family: Arial, sans-serif; font-size: 14px; fill: #333; }
+      .title { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; fill: #000; }
+      .icon { font-size: 24px; }
+      .ground { fill: #e8f4ea; stroke: none; }
+      .shadow { fill: rgba(0,0,0,0.1); }
+    </style>
+
+    <!-- Building component template -->
+    <g id="iso-building-base">
+      <polygon points="0,-30 50,-60 100,-30 50,0" class="shadow"/>
+      <polygon points="0,-30 50,-60 50,20 0,50"/>
+      <polygon points="50,-60 100,-30 100,50 50,20"/>
+      <polygon points="0,50 50,20 100,50 50,80"/>
+    </g>
+  </defs>
+
+  <!-- Title -->
+  <text x="600" y="30" text-anchor="middle" class="title" style="font-size: 28px;">GAS TOWN - Isometric Map</text>
+  <text x="600" y="55" text-anchor="middle" class="label">Multi-Agent Orchestration Architecture</text>
+
+  <!-- Ground plane -->
+  <ellipse cx="600" cy="500" rx="550" ry="250" class="ground"/>
+
+  <!-- TOWN CENTER -->
+  <!-- Mayor Building (Central, largest) -->
+  <g transform="translate(500, 250)">
+    <!-- Mayor building base -->
+    <polygon points="0,0 60,-35 120,0 60,35" class="shadow"/>
+    <polygon points="0,0 60,-35 60,60 0,95" class="mayor-building"/>
+    <polygon points="60,-35 120,0 120,95 60,60" class="mayor-building" style="fill: #e6c200;"/>
+    <polygon points="0,95 60,60 120,95 60,130" class="mayor-building"/>
+    <!-- Roof -->
+    <polygon points="10,5 60,-30 110,5 60,40" style="fill: #cc9900; stroke: #996600; stroke-width: 2;"/>
+    <!-- Icon and label -->
+    <text x="60" y="50" text-anchor="middle" class="icon">🎩</text>
+    <text x="60" y="75" text-anchor="middle" class="title" style="font-size: 14px;">MAYOR</text>
+    <text x="60" y="150" text-anchor="middle" class="label" style="font-size: 11px;">Town Coordinator</text>
+  </g>
+
+  <!-- Deacon Building (Below Mayor) -->
+  <g transform="translate(500, 420)">
+    <polygon points="0,0 50,-30 100,0 50,30" class="shadow"/>
+    <polygon points="0,0 50,-30 50,40 0,70" class="deacon-building"/>
+    <polygon points="50,-30 100,0 100,70 50,40" class="deacon-building" style="fill: #e63946;"/>
+    <polygon points="0,70 50,40 100,70 50,100" class="deacon-building"/>
+    <text x="50" y="35" text-anchor="middle" class="icon">🔔</text>
+    <text x="50" y="55" text-anchor="middle" class="title" style="font-size: 12px;">DEACON</text>
+    <text x="50" y="120" text-anchor="middle" class="label" style="font-size: 10px;">Watchdog</text>
+  </g>
+
+  <!-- RIG DISTRICT A (Left side) -->
+  <g transform="translate(200, 350)">
+    <!-- Rig district label -->
+    <text x="80" y="-20" text-anchor="middle" class="title" style="font-size: 16px;">RIG A</text>
+
+    <!-- Refinery -->
+    <g transform="translate(0, 0)">
+      <polygon points="0,0 45,-25 90,0 45,25" class="shadow"/>
+      <polygon points="0,0 45,-25 45,40 0,65" class="refinery"/>
+      <polygon points="45,-25 90,0 90,65 45,40" class="refinery" style="fill: #8fd4b8;"/>
+      <polygon points="0,65 45,40 90,65 45,90" class="refinery"/>
+      <text x="45" y="30" text-anchor="middle" class="icon" style="font-size: 20px;">🏭</text>
+      <text x="45" y="45" text-anchor="middle" class="label" style="font-size: 10px;">Refinery</text>
+    </g>
+
+    <!-- Witness -->
+    <g transform="translate(100, 50)">
+      <polygon points="0,0 40,-20 80,0 40,20" class="shadow"/>
+      <polygon points="0,0 40,-20 40,35 0,55" class="witness"/>
+      <polygon points="40,-20 80,0 80,55 40,35" class="witness" style="fill: #ff9999;"/>
+      <polygon points="0,55 40,35 80,55 40,75" class="witness"/>
+      <text x="40" y="25" text-anchor="middle" class="icon" style="font-size: 18px;">👁️</text>
+      <text x="40" y="40" text-anchor="middle" class="label" style="font-size: 10px;">Witness</text>
+    </g>
+
+    <!-- Polecats (workers) -->
+    <g transform="translate(0, 120)">
+      <!-- Polecat 1 -->
+      <polygon points="0,0 25,-15 50,0 25,15" class="polecat"/>
+      <polygon points="0,0 25,-15 25,20 0,35" class="polecat"/>
+      <polygon points="25,-15 50,0 50,35 25,20" class="polecat" style="fill: #ffbb96;"/>
+      <text x="25" y="15" text-anchor="middle" style="font-size: 16px;">🦨</text>
+      <text x="25" y="45" text-anchor="middle" class="label" style="font-size: 9px;">P1</text>
+
+      <!-- Polecat 2 -->
+      <g transform="translate(60, 0)">
+        <polygon points="0,0 25,-15 50,0 25,15" class="polecat"/>
+        <polygon points="0,0 25,-15 25,20 0,35" class="polecat"/>
+        <polygon points="25,-15 50,0 50,35 25,20" class="polecat" style="fill: #ffbb96;"/>
+        <text x="25" y="15" text-anchor="middle" style="font-size: 16px;">🦨</text>
+        <text x="25" y="45" text-anchor="middle" class="label" style="font-size: 9px;">P2</text>
+      </g>
+
+      <!-- Polecat 3 -->
+      <g transform="translate(120, 0)">
+        <polygon points="0,0 25,-15 50,0 25,15" class="polecat"/>
+        <polygon points="0,0 25,-15 25,20 0,35" class="polecat"/>
+        <polygon points="25,-15 50,0 50,35 25,20" class="polecat" style="fill: #ffbb96;"/>
+        <text x="25" y="15" text-anchor="middle" style="font-size: 16px;">🦨</text>
+        <text x="25" y="45" text-anchor="middle" class="label" style="font-size: 9px;">P3</text>
+      </g>
+    </g>
+
+    <!-- Crew members -->
+    <g transform="translate(0, 220)">
+      <!-- Crew 1 -->
+      <polygon points="0,0 25,-15 50,0 25,15" class="crew"/>
+      <polygon points="0,0 25,-15 25,20 0,35" class="crew"/>
+      <polygon points="25,-15 50,0 50,35 25,20" class="crew" style="fill: #c89f6f;"/>
+      <text x="25" y="15" text-anchor="middle" style="font-size: 16px;">👤</text>
+      <text x="25" y="45" text-anchor="middle" class="label" style="font-size: 9px;">C1</text>
+
+      <!-- Crew 2 -->
+      <g transform="translate(60, 0)">
+        <polygon points="0,0 25,-15 50,0 25,15" class="crew"/>
+        <polygon points="0,0 25,-15 25,20 0,35" class="crew"/>
+        <polygon points="25,-15 50,0 50,35 25,20" class="crew" style="fill: #c89f6f;"/>
+        <text x="25" y="15" text-anchor="middle" style="font-size: 16px;">👤</text>
+        <text x="25" y="45" text-anchor="middle" class="label" style="font-size: 9px;">C2</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- RIG DISTRICT B (Right side) -->
+  <g transform="translate(800, 350)">
+    <!-- Rig district label -->
+    <text x="80" y="-20" text-anchor="middle" class="title" style="font-size: 16px;">RIG B</text>
+
+    <!-- Refinery -->
+    <g transform="translate(0, 0)">
+      <polygon points="0,0 45,-25 90,0 45,25" class="shadow"/>
+      <polygon points="0,0 45,-25 45,40 0,65" class="refinery"/>
+      <polygon points="45,-25 90,0 90,65 45,40" class="refinery" style="fill: #8fd4b8;"/>
+      <polygon points="0,65 45,40 90,65 45,90" class="refinery"/>
+      <text x="45" y="30" text-anchor="middle" class="icon" style="font-size: 20px;">🏭</text>
+      <text x="45" y="45" text-anchor="middle" class="label" style="font-size: 10px;">Refinery</text>
+    </g>
+
+    <!-- Witness -->
+    <g transform="translate(100, 50)">
+      <polygon points="0,0 40,-20 80,0 40,20" class="shadow"/>
+      <polygon points="0,0 40,-20 40,35 0,55" class="witness"/>
+      <polygon points="40,-20 80,0 80,55 40,35" class="witness" style="fill: #ff9999;"/>
+      <polygon points="0,55 40,35 80,55 40,75" class="witness"/>
+      <text x="40" y="25" text-anchor="middle" class="icon" style="font-size: 18px;">👁️</text>
+      <text x="40" y="40" text-anchor="middle" class="label" style="font-size: 10px;">Witness</text>
+    </g>
+
+    <!-- Polecats -->
+    <g transform="translate(0, 120)">
+      <!-- Polecat 4 -->
+      <polygon points="0,0 25,-15 50,0 25,15" class="polecat"/>
+      <polygon points="0,0 25,-15 25,20 0,35" class="polecat"/>
+      <polygon points="25,-15 50,0 50,35 25,20" class="polecat" style="fill: #ffbb96;"/>
+      <text x="25" y="15" text-anchor="middle" style="font-size: 16px;">🦨</text>
+      <text x="25" y="45" text-anchor="middle" class="label" style="font-size: 9px;">P4</text>
+
+      <!-- Polecat 5 -->
+      <g transform="translate(60, 0)">
+        <polygon points="0,0 25,-15 50,0 25,15" class="polecat"/>
+        <polygon points="0,0 25,-15 25,20 0,35" class="polecat"/>
+        <polygon points="25,-15 50,0 50,35 25,20" class="polecat" style="fill: #ffbb96;"/>
+        <text x="25" y="15" text-anchor="middle" style="font-size: 16px;">🦨</text>
+        <text x="25" y="45" text-anchor="middle" class="label" style="font-size: 9px;">P5</text>
+      </g>
+    </g>
+
+    <!-- Crew member -->
+    <g transform="translate(0, 220)">
+      <polygon points="0,0 25,-15 50,0 25,15" class="crew"/>
+      <polygon points="0,0 25,-15 25,20 0,35" class="crew"/>
+      <polygon points="25,-15 50,0 50,35 25,20" class="crew" style="fill: #c89f6f;"/>
+      <text x="25" y="15" text-anchor="middle" style="font-size: 16px;">👤</text>
+      <text x="25" y="45" text-anchor="middle" class="label" style="font-size: 9px;">C3</text>
+    </g>
+  </g>
+
+  <!-- ROUTES AND CONNECTIONS -->
+  <!-- Convoy route from Mayor to Rig A -->
+  <path d="M 560 380 Q 450 380 290 380" class="convoy-route" marker-end="url(#arrowblue)"/>
+  <text x="420" y="370" class="label" style="font-size: 11px; fill: #4a90e2;">🚚 Convoy</text>
+
+  <!-- Convoy route from Mayor to Rig B -->
+  <path d="M 620 380 Q 730 380 845 380" class="convoy-route" marker-end="url(#arrowblue)"/>
+
+  <!-- Mail flow -->
+  <path d="M 550 520 Q 400 560 290 580" class="mail-flow" marker-end="url(#arrowgreen)"/>
+  <text x="380" y="575" class="label" style="font-size: 11px; fill: #50c878;">✉️ Mail</text>
+
+  <path d="M 600 520 Q 750 560 845 580" class="mail-flow" marker-end="url(#arrowgreen)"/>
+
+  <!-- Work distribution paths (dashed) -->
+  <path d="M 290 440 L 290 490" class="path"/>
+  <path d="M 845 440 L 845 490" class="path"/>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowblue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#4a90e2" />
+    </marker>
+    <marker id="arrowgreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#50c878" />
+    </marker>
+  </defs>
+
+  <!-- LEGEND -->
+  <g transform="translate(50, 700)">
+    <rect x="0" y="0" width="280" height="180" fill="white" stroke="#333" stroke-width="2" rx="5"/>
+    <text x="140" y="25" text-anchor="middle" class="title" style="font-size: 14px;">Legend</text>
+
+    <!-- Town Level -->
+    <text x="10" y="50" class="label" style="font-weight: bold;">Town Level:</text>
+    <rect x="10" y="55" width="20" height="15" class="mayor-building"/>
+    <text x="35" y="67" class="label" style="font-size: 11px;">🎩 Mayor (Coordinator)</text>
+    <rect x="10" y="75" width="20" height="15" class="deacon-building"/>
+    <text x="35" y="87" class="label" style="font-size: 11px;">🔔 Deacon (Watchdog)</text>
+
+    <!-- Rig Level -->
+    <text x="10" y="110" class="label" style="font-weight: bold;">Rig Level:</text>
+    <rect x="10" y="115" width="20" height="15" class="refinery"/>
+    <text x="35" y="127" class="label" style="font-size: 11px;">🏭 Refinery (Merge Queue)</text>
+    <rect x="10" y="135" width="20" height="15" class="witness"/>
+    <text x="35" y="147" class="label" style="font-size: 11px;">👁️ Witness (Oversight)</text>
+    <rect x="10" y="155" width="20" height="15" class="polecat"/>
+    <text x="35" y="167" class="label" style="font-size: 11px;">🦨 Polecat (Worker)</text>
+  </g>
+
+  <g transform="translate(350, 700)">
+    <rect x="0" y="0" width="250" height="180" fill="white" stroke="#333" stroke-width="2" rx="5"/>
+    <text x="125" y="25" text-anchor="middle" class="title" style="font-size: 14px;">Work Flows</text>
+
+    <rect x="10" y="35" width="20" height="15" class="crew"/>
+    <text x="35" y="47" class="label" style="font-size: 11px;">👤 Crew (Persistent)</text>
+
+    <line x1="10" y1="65" x2="100" y2="65" class="convoy-route"/>
+    <text x="110" y="70" class="label" style="font-size: 11px;">Convoy Route</text>
+
+    <line x1="10" y1="85" x2="100" y2="85" class="mail-flow"/>
+    <text x="110" y="90" class="label" style="font-size: 11px;">Mail Flow</text>
+
+    <line x1="10" y1="105" x2="100" y2="105" class="path"/>
+    <text x="110" y="110" class="label" style="font-size: 11px;">Work Path</text>
+
+    <text x="10" y="135" class="label" style="font-size: 10px; font-style: italic;">Scale: 1 Town → N Rigs</text>
+    <text x="10" y="150" class="label" style="font-size: 10px; font-style: italic;">Each Rig → 0-20+ Polecats</text>
+    <text x="10" y="165" class="label" style="font-size: 10px; font-style: italic;">Each Rig → 1-5 Crew (typical)</text>
+  </g>
+
+  <!-- Attribution -->
+  <text x="1100" y="880" text-anchor="end" class="label" style="font-size: 10px; fill: #999;">Gas Town Architecture © 2026</text>
+</svg>
