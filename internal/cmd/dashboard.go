@@ -55,10 +55,15 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create the handler
-	handler, err := web.NewConvoyHandler(fetcher)
+	convoyHandler, err := web.NewConvoyHandler(fetcher)
 	if err != nil {
 		return fmt.Errorf("creating convoy handler: %w", err)
 	}
+
+	// Set up routes with static file serving
+	mux := http.NewServeMux()
+	mux.Handle("/", convoyHandler)
+	mux.Handle("/static/", http.StripPrefix("/static/", web.StaticFileHandler()))
 
 	// Build the URL
 	url := fmt.Sprintf("http://localhost:%d", dashboardPort)
@@ -74,7 +79,7 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", dashboardPort),
-		Handler:           handler,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
