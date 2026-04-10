@@ -2271,6 +2271,17 @@ func getTrackedIssues(townBeads, convoyID string) ([]trackedIssueInfo, error) {
 	// Fetch fresh issue details via bd show (uses prefix routing for cross-rig).
 	freshDetails := getIssueDetailsBatch(trackedIDs)
 
+	// For any tracked IDs not resolved by the batch lookup, try cross-rig
+	// raw SQL as a fallback. This handles the common case where bd show
+	// can't route to rig databases since beads v0.62. (GH #3581)
+	for _, id := range trackedIDs {
+		if _, ok := freshDetails[id]; !ok {
+			if details := getIssueDetailsCrossRig(townBeads, id); details != nil {
+				freshDetails[id] = details
+			}
+		}
+	}
+
 	// Build tracked dependency structs from fresh details
 	var deps []trackedDependency
 	for _, id := range trackedIDs {
@@ -2505,11 +2516,21 @@ func getIssueDetailsBatch(issueIDs []string) map[string]*issueDetails {
 	showCmd.Stdout = &stdout
 
 	if err := showCmd.Run(); err != nil {
-		// Batch failed - fall back to individual lookups for robustness
-		// This handles cases where some IDs are invalid/missing
+		// Batch failed - fall back to individual lookups for robustness.
+		// This handles cases where some IDs are invalid/missing.
+		// For cross-rig beads, try raw SQL against the rig's database
+		// since bd show can't route cross-rig since v0.62. (GH #3581)
+		townBeads := ""
+		if townRoot != "" {
+			townBeads = beads.ResolveBeadsDir(townRoot)
+		}
 		for _, id := range issueIDs {
 			if details := getIssueDetails(id); details != nil {
 				result[id] = details
+			} else if townBeads != "" {
+				if details := getIssueDetailsCrossRig(townBeads, id); details != nil {
+					result[id] = details
+				}
 			}
 		}
 		return result
@@ -2525,6 +2546,50 @@ func getIssueDetailsBatch(issueIDs []string) map[string]*issueDetails {
 	}
 
 	return result
+}
+
+// getIssueDetailsCrossRig fetches issue status via raw SQL for cross-rig beads.
+// When bd show fails for a rig-prefixed bead (because bd can't route cross-rig
+// since v0.62), this queries the bead's home database directly on the shared
+// Dolt server. The database name is the bead prefix without the trailing hyphen
+// (e.g., "bh-sct" → database "bh"). See GH #3581.
+func getIssueDetailsCrossRig(townBeads, issueID string) *issueDetails {
+	prefix := beads.ExtractPrefix(issueID)
+	if prefix == "" || prefix == "hq-" {
+		return nil // Not cross-rig or already in hq
+	}
+	dbName := strings.TrimSuffix(prefix, "-")
+	if !isValidBeadID(dbName) || !isValidBeadID(issueID) {
+		return nil
+	}
+
+	query := fmt.Sprintf(
+		"SELECT id, title, status, issue_type, assignee FROM %s.issues WHERE id = '%s'",
+		dbName, issueID,
+	)
+	out, err := runBdJSON(townBeads, "sql", query, "--json")
+	if err != nil {
+		return nil
+	}
+
+	var rows []struct {
+		ID        string `json:"id"`
+		Title     string `json:"title"`
+		Status    string `json:"status"`
+		IssueType string `json:"issue_type"`
+		Assignee  string `json:"assignee"`
+	}
+	if err := json.Unmarshal(out, &rows); err != nil || len(rows) == 0 {
+		return nil
+	}
+
+	return &issueDetails{
+		ID:        rows[0].ID,
+		Title:     rows[0].Title,
+		Status:    rows[0].Status,
+		IssueType: rows[0].IssueType,
+		Assignee:  rows[0].Assignee,
+	}
 }
 
 // getIssueDetails fetches issue details by trying to show it via bd.
